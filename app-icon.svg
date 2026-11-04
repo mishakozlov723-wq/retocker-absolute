@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#303033"/>
+      <stop offset="1" stop-color="#151516"/>
+    </linearGradient>
+    <linearGradient id="pill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e4e4e1"/>
+    </linearGradient>
+  </defs>
+  <rect x="48" y="48" width="928" height="928" rx="224" fill="url(#bg)"/>
+  <rect x="48.5" y="48.5" width="927" height="927" rx="223.5" fill="none" stroke="#ffffff" stroke-opacity=".08" stroke-width="3"/>
+  <rect x="176" y="372" width="672" height="280" rx="140" fill="url(#pill)"/>
+  <circle cx="318" cy="512" r="52" fill="#18181a"/>
+  <rect x="430" y="462" width="40" height="100" rx="20" fill="#18181a"/>
+  <rect x="510" y="422" width="40" height="180" rx="20" fill="#18181a"/>
+  <rect x="590" y="447" width="40" height="130" rx="20" fill="#18181a"/>
+  <rect x="670" y="477" width="40" height="70" rx="20" fill="#18181a"/>
+</svg>

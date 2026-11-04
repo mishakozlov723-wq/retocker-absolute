@@ -1,0 +1,14 @@
+{
+  "name": "retocker-absolute",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "prepare-ui": "node scripts/prepare.mjs",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.4",
+    "motion": "14.9.1"
+  }
+}

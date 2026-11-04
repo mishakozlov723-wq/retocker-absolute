@@ -1,8 +1,97 @@
-name: build
+name: Build
+
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: build
+  cancel-in-progress: true
+
 jobs:
-  noop:
-    runs-on: ubuntu-latest
+  windows:
+    runs-on: windows-latest
+    env:
+      VER: 1.0.${{ github.run_number }}
     steps:
-      - run: echo ok
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Prepare
+        shell: bash
+        run: |
+          set -o pipefail
+          npm install --no-audit --no-fund 2>&1 | tee -a ci.log
+          node scripts/prepare.mjs "$VER" 2>&1 | tee -a ci.log
+          npx tauri icon app-icon.svg -o src-tauri/icons 2>&1 | tail -3 | tee -a ci.log
+
+      - name: Build
+        shell: bash
+        run: |
+          set -o pipefail
+          npx tauri build --bundles nsis 2>&1 | tee -a ci.log
+          ls -la src-tauri/target/release/bundle/nsis | tee -a ci.log
+
+      - name: Smoke test
+        id: smoke
+        continue-on-error: true
+        shell: pwsh
+        run: ./scripts/smoke.ps1
+
+      - name: Screenshots to the ci-shots branch
+        if: always() && steps.smoke.outcome != 'skipped'
+        continue-on-error: true
+        shell: bash
+        run: |
+          git config user.name "ci"
+          git config user.email "ci@users.noreply.github.com"
+          mkdir -p out && cp -r shots smoke.txt out/ 2>/dev/null || true
+          git checkout --orphan ci-shots
+          git rm -rf --cached . > /dev/null
+          git add -f out
+          git commit -q -m "run ${{ github.run_number }}"
+          git push -q -f origin ci-shots
+
+      - name: Release
+        if: contains(github.event.head_commit.message, '[release]')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -o pipefail
+          cp src-tauri/target/release/bundle/nsis/*-setup.exe Retocker-Absolute-Setup.exe
+          cp src-tauri/target/release/retocker-absolute.exe Retocker-Absolute-portable.exe
+          gh release create "v$VER" Retocker-Absolute-Setup.exe Retocker-Absolute-portable.exe \
+            --title "Retocker Absolute $VER" --notes-file RELEASE.md 2>&1 | tee -a ci.log
+
+      - name: Keep the build
+        uses: actions/upload-artifact@v4
+        with:
+          name: retocker-absolute-${{ env.VER }}
+          path: |
+            src-tauri/target/release/bundle/nsis/*-setup.exe
+            src-tauri/target/release/retocker-absolute.exe
+          retention-days: 14
+
+      - name: Report a failure
+        if: failure()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          { echo "Run ${{ github.run_number }} (${GITHUB_SHA::7}) failed. Last lines of the log:"; echo; echo '```'; tail -c 60000 ci.log 2>/dev/null | grep -v '^\s*Compiling ' | tail -n 400; echo '```'; } > issue.md
+          gh issue create --title "Build ${{ github.run_number }} failed" --body-file issue.md
