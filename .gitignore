@@ -6,3 +6,4 @@ ui/vendor/
 shots/
 smoke.txt
 ci.log
+ui/engine.js
