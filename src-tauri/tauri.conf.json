@@ -1,0 +1,35 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Retocker Absolute",
+  "mainBinaryName": "retocker-absolute",
+  "version": "1.0.0",
+  "identifier": "com.retocker.absolute",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "Retocker",
+    "copyright": "Retocker",
+    "shortDescription": "Диктовка в любую программу",
+    "longDescription": "Говоришь — текст появляется там, где курсор.",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"],
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper", "silent": true },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["Russian"],
+        "displayLanguageSelector": false,
+        "startMenuFolder": "Retocker"
+      }
+    }
+  }
+}
