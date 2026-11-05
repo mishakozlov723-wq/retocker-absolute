@@ -22,6 +22,6 @@
 бесплатном тарифе не принимает exe. Страница скачивания и `latest.json` (по нему программа узнаёт о новой
 версии) — на https://retocker-voice.web.app/absolute/, ссылки ведут на `releases/latest/download/…`.
 
-До 1.0.15 программа называлась Retocker Absolute. Поэтому `identifier` остался `com.retocker.absolute` (там лежат
-настройки и ключ), а установщик (`src-tauri/installer-hooks.nsh`) тихо удаляет старую копию; автозапуск переносится
-на новое имя при первом старте (`win::autostart_migrate`).
+До 1.0.19 программа называлась Retocker Absolute. Поэтому `identifier` остался `com.retocker.absolute` (там лежат
+настройки и ключ), а установщик (`src-tauri/installer-hooks.nsh`) тихо удаляет старую копию и переносит автозапуск
+на новое имя (запасной вариант — `win::autostart_migrate` при старте программы).
