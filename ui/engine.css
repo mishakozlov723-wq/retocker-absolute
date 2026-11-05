@@ -44,7 +44,9 @@
 .c-ok{background:var(--wave);color:var(--c-bgs,#191919)}
 .c-ok:hover{transform:scale(1.08)}
 .c-x:active,.c-ok:active{transform:scale(.92)}
-.cc .c-x svg,.cc .c-ok svg{width:13px;height:13px;stroke-width:2.2}
+/* Phosphor Icons (bold) — filled shapes, crisp at this size */
+.cc .c-x svg,.cc .c-ok svg{width:12px;height:12px;fill:currentColor;stroke:none}
+.cc .c-ok svg{width:13px;height:13px}
 .c-dot{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;flex:none;position:relative;transition:background-color .15s}
 .cc[data-live=tap] .c-dot:hover{background:var(--c-btn)}
 .cc:not([data-live=tap]) .c-dot{cursor:inherit}

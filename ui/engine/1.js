@@ -25,9 +25,9 @@ stage.insertAdjacentHTML('beforeend', `
   <div class="g" id="gMini"><div class="gi g-mini"><i></i><i></i><i></i><i></i><i></i></div></div>
   <div class="g" id="gHint"><div class="gi g-hint"><span id="hintTxt">Ctrl+Win</span><b id="hintB">говорить</b></div></div>
   <div class="g" id="gRec">
-    <div class="rp" id="recL"><button class="c-x" data-k="cancel" title="Отменить (Esc)"><svg viewBox="0 0 16 16"><path d="m5 5 6 6m0-6-6 6"/></svg></button><button class="c-dot" data-k="dot" title="Показать текст"><b id="cRing"></b><i id="cDot"></i></button></div>
+    <div class="rp" id="recL"><button class="c-x" data-k="cancel" title="Отменить (Esc)"><svg viewBox="0 0 256 256"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg></button><button class="c-dot" data-k="dot" title="Показать текст"><b id="cRing"></b><i id="cDot"></i></button></div>
     <div class="rp" id="recC"><canvas class="c-wave" id="wave"></canvas></div>
-    <div class="rp" id="recR"><span class="c-time" id="time">0:00</span><button class="c-ok" data-k="ok" title="Готово"><svg viewBox="0 0 16 16"><path d="m4 8.4 2.7 2.7L12 5.6"/></svg></button></div>
+    <div class="rp" id="recR"><span class="c-time" id="time">0:00</span><button class="c-ok" data-k="ok" title="Готово"><svg viewBox="0 0 256 256"><path d="M232.49,80.49l-128,128a12,12,0,0,1-17,0l-56-56a12,12,0,1,1,17-17L96,183,215.51,63.51a12,12,0,0,1,17,17Z"/></svg></button></div>
   </div>
   <div class="g" id="gProc"><div class="gi g-proc"><span class="p-shimmer" id="procTxt">Причёсываю…</span><span class="p-dots"><i></i><i></i><i></i></span><span class="p-ring"></span></div></div>
   <div class="g" id="gRev"><div class="gi g-rev"><kbd>Enter</kbd><span>вставить</span></div></div>
