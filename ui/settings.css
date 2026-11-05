@@ -264,3 +264,11 @@ select.in option{background:#262626}
 .unotes{font-size:12px;color:var(--tx2);line-height:1.5;white-space:pre-line;padding:0 1px}
 .pbar{height:6px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden}
 .pbar b{display:block;height:100%;width:0;background:var(--ok);border-radius:3px;transition:width .12s linear}
+/* «Мгновенный живой текст» */
+.row.fast .rt.mid{flex-wrap:wrap;row-gap:8px}
+.row.fast .rt.mid .status{flex:1;min-width:0}
+.row.fast .rt:first-child .lbl{flex:1;min-width:0}
+.swc.off{background:linear-gradient(135deg,transparent 44%,rgba(255,255,255,.5) 44% 56%,transparent 56%),rgba(255,255,255,.06)}
+.asrout{min-height:44px;max-height:120px;overflow:auto;border-radius:9px;background:rgba(255,255,255,.05);border:1px solid var(--ln);padding:9px 11px;font-size:13.5px;line-height:1.5;color:var(--tx);user-select:text;-webkit-user-select:text}
+.asrout .tent{opacity:.55}
+.asrout .ph{color:var(--tx3)}
