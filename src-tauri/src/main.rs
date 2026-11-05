@@ -1,6 +1,8 @@
 // Retocker Voice: dictation for Windows. Speak — the text appears where the cursor is.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod asr;
+mod asr_core;
 mod hook;
 mod logx;
 mod paste;
@@ -283,6 +285,12 @@ fn main() {
   }
   logx::init(sys::local_appdata().join("com.retocker.absolute").join("logs"));
   std::panic::set_hook(Box::new(|p| logx::log(&format!("panic: {p}"))));
+  // RA_DEBUG only (the build check): download the local speech model, recognise a test recording, report
+  if let Some(out) = setup::arg_after(&args, "--asr-selftest") {
+    if std::env::var("RA_DEBUG").map(|v| v == "1").unwrap_or(false) {
+      std::process::exit(asr::selftest(&out));
+    }
+  }
   // after an update the new copy starts while the old one is still quitting: wait for it
   if let Some(pid) = setup::arg_after(&args, "--wait-pid").and_then(|s| s.parse::<u32>().ok()) {
     let gone = sys::wait_pid(pid, 20000);
@@ -334,7 +342,8 @@ fn run_app(ctx: tauri::Context<tauri::Wry>, autostarted: bool) {
     }))
     .invoke_handler(tauri::generate_handler![
       set_hotkey, set_keys, hk_record, set_paused, set_hit, paste, copy_text, fg_app, focus_overlay, show_settings, quit,
-      app_info, autostart, open_url, open_logs, log, win_ctl, upd_check, upd_install
+      app_info, autostart, open_url, open_logs, log, win_ctl, upd_check, upd_install, asr::asr_status, asr::asr_get, asr::asr_cancel,
+      asr::asr_del, asr::asr_warm, asr::asr_start, asr::asr_feed, asr::asr_finish
     ])
     .setup(move |app| {
       let h = app.handle().clone();
@@ -343,6 +352,7 @@ fn run_app(ctx: tauri::Context<tauri::Wry>, autostarted: bool) {
       }
       logx::log(&format!("start v{} autostart={autostarted} updated={}", app.package_info().version, UPDATED.get().map(|s| s.as_str()).unwrap_or("")));
       win::autostart_migrate();
+      asr::init(&h);
 
       // the capsule: a transparent layer over the whole work area that lets clicks through except on the capsule
       let cap = WebviewWindowBuilder::new(app, "capsule", WebviewUrl::App("capsule.html".into()))

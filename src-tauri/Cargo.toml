@@ -13,6 +13,8 @@ tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# the local speech model: its engine (a DLL downloaded with the model) is loaded at run time
+libloading = "0.8"
 
 [target.'cfg(windows)'.dependencies]
 # updates: plain HTTPS through Windows' own TLS (no OpenSSL / ring), SHA-256 and an Ed25519 signature check

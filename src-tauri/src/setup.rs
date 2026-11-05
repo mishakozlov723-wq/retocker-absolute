@@ -75,6 +75,9 @@ pub struct Opts {
   pub dir: String,
   pub autostart: bool,
   pub desktop: bool,
+  /// «Мгновенный живой текст»: the app downloads the local speech model on its first start
+  #[serde(default)]
+  pub asr: bool,
 }
 
 /// the old NSIS installs (1.0.20 and before, also under the old name): quietly removed first.
@@ -217,6 +220,15 @@ pub fn install(ver: &str, o: &Opts, step: &dyn Fn(u32, &str)) -> Result<PathBuf,
   } else {
     sys::reg_del_value(RUN, NAME);
   }
+  let want = crate::asr::want_marker();
+  if o.asr {
+    if let Some(d) = want.parent() {
+      let _ = std::fs::create_dir_all(d);
+    }
+    let _ = std::fs::write(&want, "1");
+  } else {
+    let _ = std::fs::remove_file(&want);
+  }
   step(100, "Готово");
   logx::log(&format!("setup: installed {ex}"));
   Ok(exe)
@@ -246,7 +258,7 @@ pub fn uninstall(wipe: bool, step: &dyn Fn(u32, &str)) -> Result<(), String> {
   sys::reg_del_tree(UNINST_KEY);
   if wipe {
     step(70, "Удаляю настройки и ключ…");
-    for d in [sys::local_appdata().join(IDENT), sys::roaming_appdata().join(IDENT)] {
+    for d in [sys::local_appdata().join(IDENT), sys::roaming_appdata().join(IDENT)].into_iter().chain(crate::asr::wipe_dirs()) {
       for _ in 0..12 {
         if !d.exists() || std::fs::remove_dir_all(&d).is_ok() {
           break;
@@ -288,6 +300,7 @@ pub fn silent(m: Mode, ver: &str, args: &[String]) -> i32 {
         dir: arg_after(args, "--dir").unwrap_or_else(|| default_dir().display().to_string()),
         autostart: !args.iter().any(|a| a == "--no-autostart"),
         desktop: !args.iter().any(|a| a == "--no-desktop"),
+        asr: args.iter().any(|a| a == "--asr"),
       };
       match install(ver, &o, &log) {
         Ok(_) => 0,
@@ -446,7 +459,7 @@ pub fn run_ui(m: Mode, ctx: tauri::Context<tauri::Wry>) {
       let init = format!("window.RA_SETUP = {};", json!({ "mode": if un { "uninstall" } else { "setup" } }));
       WebviewWindowBuilder::new(app, "setup", WebviewUrl::App("setup.html".into()))
         .title(if un { "Удаление Retocker Voice" } else { "Установка Retocker Voice" })
-        .inner_size(640.0, 460.0)
+        .inner_size(640.0, 490.0)
         .resizable(false)
         .maximizable(false)
         .center()
