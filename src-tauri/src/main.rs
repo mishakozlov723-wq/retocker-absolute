@@ -246,7 +246,17 @@ fn main() {
   std::panic::set_hook(Box::new(|p| logx::log(&format!("panic: {p}"))));
 
   tauri::Builder::default()
-    .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_main(app, None)))
+    .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+      // RA_DEBUG only (the build check): a second start with --test-keys plays key events through the hook logic
+      if let Some(i) = args.iter().position(|a| a == "--test-keys") {
+        if hook::debug() {
+          let spec = args.get(i + 1).cloned().unwrap_or_default();
+          std::thread::spawn(move || hook::test_keys(&spec));
+          return;
+        }
+      }
+      show_main(app, None)
+    }))
     .invoke_handler(tauri::generate_handler![
       set_hotkey, set_keys, hk_record, set_paused, set_hit, paste, copy_text, fg_app, focus_overlay, show_settings, quit,
       app_info, autostart, open_url, open_logs, log, win_ctl

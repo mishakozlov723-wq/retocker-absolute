@@ -354,6 +354,7 @@ function insert(text, dur = 0) {
   setState('done'); closePanel(); sound('done');
   if (ENV.onInsert) Promise.resolve(ENV.onInsert(text, { words: n, sec: dur })).catch(e => {
     RA.log('insert: ' + (e && e.message || e));
+    if (ENV.copy) Promise.resolve(ENV.copy(text)).catch(() => {});
     errTxt.textContent = 'Не вставилось — текст скопирован'; errAct = null; setState('err'); sound('err');
     clearTimeout(idleT); idleT = setTimeout(toIdle, 3200);
   });
@@ -555,38 +556,4 @@ lText.addEventListener('keydown', e => {
 });
 lText.addEventListener('input', () => { if (state === 'review') { const n = wc(lText.innerText); lCnt.textContent = n ? words_(n) : ''; updatePanel(); } });
 window.addEventListener('blur', () => { if (OVERLAY && editing) setEditing(false); });
-
-/* ---------------- hotkey (events come from the keyboard hook of the app) */
-let held = false, hkT = 0;
-const canStart = () => ['idle', 'done', 'err'].includes(state);
-function toggle() { if (canStart()) startRec(); else if (state === 'rec') finish(); }
-function hk(t, other) {
-  const modOnly = RA.isModOnly(S.hk), hold = S.mode === 'hold';
-  if (t === 'down') {
-    if (pv) { clearPreview(); toIdle(); }
-    if (hold) {
-      if (!canStart()) return;
-      // Ctrl+Win and the like are also parts of other shortcuts: wait a moment to be sure (the mic is already on)
-      if (modOnly) { if (OVERLAY) micOpen(); clearTimeout(hkT); hkT = setTimeout(() => { hkT = 0; held = true; startRec(); }, 130); }
-      else { held = true; startRec(); }
-    } else if (!modOnly) toggle();
-    else if (canStart() && OVERLAY) micOpen();
-    return;
-  }
-  if (t === 'other') {
-    if (hkT) { clearTimeout(hkT); hkT = 0; }
-    if (!rec && warm) micClose(warm);
-    if (held) { held = false; if (state === 'rec') cancel(); }
-    return;
-  }
-  if (t === 'up') {
-    if (hkT) { clearTimeout(hkT); hkT = 0; if (!rec && warm) micClose(warm); return; }
-    if (hold) { if (held) { held = false; if (state === 'rec') finish(); } return; }
-    if (modOnly) { if (!other) toggle(); else if (!rec && warm) micClose(warm); }
-  }
-}
-function key(k) {
-  if (k === 'esc' && ['rec', 'proc', 'review', 'err'].includes(state)) cancel();
-  else if (k === 'enter' && state === 'review') insert(lText.innerText);
-}
 
