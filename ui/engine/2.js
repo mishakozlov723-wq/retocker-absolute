@@ -1,3 +1,31 @@
+  const c = capFinal();
+  const sp = SPR(Math.min(.42, st.pvd * .85), Math.min(.12, st.pb * .5));
+  pT = null;
+  animate(P.x, c.x + 3, sp); animate(P.y, c.y + 3, sp); animate(P.w, Math.max(0, c.w - 6), sp); animate(P.h, Math.max(0, c.h - 6), sp); animate(P.r, Math.max(0, c.r - 3), sp);
+  animate(P.op, 0, TW(.12, Math.min(.42, st.pvd * .85) * .62)).then(() => { if (my === pTok && !panelOpen) hidePanel(); });
+}
+let upQ = false, upJump = false;
+function updatePanel(o = {}) {
+  if (!panelOpen) return;
+  setMode();
+  if (o.jump) upJump = true;
+  if (upQ) return; upQ = true;
+  frame.read(() => { upQ = false; if (!panelOpen) return; const t = panelTarget(); toPanel(t, upJump ? 'jump' : 'resize'); upJump = false; req(); });
+}
+function togglePanel() { panelOpen ? closePanel() : openPanel(); }
+// soft top / bottom edges of the text only where there is more to scroll (the scrollbar itself is hidden)
+let autoScroll = 0;
+function lbFade() {
+  const t = lBody.scrollTop, m = lBody.scrollHeight - lBody.clientHeight;
+  lBody.classList.toggle('ft', t > 1);
+  lBody.classList.toggle('fb', m - t > 1 && performance.now() > autoScroll);
+}
+lBody.addEventListener('scroll', lbFade, { passive: true });
+lBody.addEventListener('scrollend', () => { autoScroll = 0; lbFade(); });
+new ResizeObserver(lbFade).observe(lText);
+new ResizeObserver(lbFade).observe(lBody);
+function updCount() { const n = wc(words.filter(w => !w.dead).map(w => w.t).join(' ')); lCnt.textContent = n ? words_(n) : ''; }
+
 /* ---------------- text model */
 function addWord(t, meta = {}) {
   const el = document.createElement('span'); el.className = 'w';
@@ -14,7 +42,7 @@ function addWord(t, meta = {}) {
   }
   const w = { el, t, c: meta.c, fill: !!meta.fill };
   words.push(w); updCount();
-  if (panelOpen && !still) { updatePanel(); lBody.scrollTo({ top: lBody.scrollHeight, behavior: 'smooth' }); }
+  if (panelOpen && !still) { updatePanel(); autoScroll = performance.now() + 700; lBody.scrollTo({ top: lBody.scrollHeight, behavior: 'smooth' }); }
   return w;
 }
 // "magic move": words that keep their line glide to their new places; a word that lands on another line
@@ -505,58 +533,3 @@ stage.addEventListener('pointermove', e => {
     }
     return;
   }
-  const over = overCap(e, state === 'idle' ? 14 : 3) && !e.target.closest('#pc' + (ENV.ignore ? ',' + ENV.ignore : ''));
-  setCursor(over && !e.target.closest('.cc button') ? 'grab' : '');
-  const h = state === 'idle' && over;
-  if (h !== hover) { hover = h; retarget(); }
-});
-function endPress(e) {
-  if (!press) return;
-  const p = press; press = null;
-  try { stage.releasePointerCapture(p.id); } catch (x) {}
-  if (p.drag) {
-    dragging = false; guide.classList.remove('on'); setCursor('grab');
-    const c = freeCenter(tz.w, tz.h, S.scale / 100); S.fx = c.x / SW; S.fy = c.y / SH;
-    save(); changed(); setOp(); breath(); req();
-    return;
-  }
-  if (e.type === 'pointerup') action(p.k);
-}
-stage.addEventListener('pointerup', endPress);
-stage.addEventListener('pointercancel', endPress);
-stage.addEventListener('pointerleave', () => { if (!press) { setCursor(''); if (hover) { hover = false; retarget(); } } });
-function action(k) {
-  if (pv) { clearPreview(); toIdle(); return; }
-  if (state === 'idle') { startRec(); return; }
-  if (state === 'rec') {
-    if (k === 'cancel') return cancel();
-    if (k === 'ok') return finish();
-    if (k === 'dot' && S.live !== 'off') return togglePanel();
-    return finish();
-  }
-  if (state === 'done') { if (lastText && ENV.copy) { ENV.copy(lastText); doneTxt.textContent = 'Скопировано'; retarget(); clearTimeout(idleT); idleT = setTimeout(toIdle, 1400); } else toIdle(); return; }
-  if (state === 'err') {
-    const a = errAct;
-    if (a === 'retry' && lastAudio) return retry();
-    if ((a === 'key' || a === 'mic') && ENV.openSettings) ENV.openSettings(a === 'key' ? 'key' : 'control');
-    toIdle();
-  }
-}
-pc.addEventListener('click', e => {
-  const b = e.target.closest('[data-k]'); if (!b) return;
-  if (b.dataset.k === 'insert') insert(lText.innerText);
-  if (b.dataset.k === 'copy') {
-    const t = lText.innerText.trim();
-    Promise.resolve(ENV.copy ? ENV.copy(t) : navigator.clipboard.writeText(t)).then(() => { b.textContent = 'Скопировано'; setTimeout(() => { b.textContent = 'Копировать'; }, 1400); }, () => {});
-  }
-});
-lText.addEventListener('pointerdown', () => { if (state === 'review' && OVERLAY && !editing) { setEditing(true); setTimeout(() => lText.focus({ preventScroll: true }), 60); } });
-lText.addEventListener('keydown', e => {
-  if (state !== 'review') return;
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); insert(lText.innerText); }
-  else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
-  e.stopPropagation();
-});
-lText.addEventListener('input', () => { if (state === 'review') { const n = wc(lText.innerText); lCnt.textContent = n ? words_(n) : ''; updatePanel(); } });
-window.addEventListener('blur', () => { if (OVERLAY && editing) setEditing(false); });
-
