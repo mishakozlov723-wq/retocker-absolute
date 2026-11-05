@@ -1,3 +1,58 @@
+  const over = overCap(e, state === 'idle' ? 14 : 3) && !e.target.closest('#pc' + (ENV.ignore ? ',' + ENV.ignore : ''));
+  setCursor(over && !e.target.closest('.cc button') ? 'grab' : '');
+  const h = state === 'idle' && over;
+  if (h !== hover) { hover = h; retarget(); }
+});
+function endPress(e) {
+  if (!press) return;
+  const p = press; press = null;
+  try { stage.releasePointerCapture(p.id); } catch (x) {}
+  if (p.drag) {
+    dragging = false; guide.classList.remove('on'); setCursor('grab');
+    const c = freeCenter(tz.w, tz.h, S.scale / 100); S.fx = c.x / SW; S.fy = c.y / SH;
+    save(); changed(); setOp(); breath(); req();
+    return;
+  }
+  if (e.type === 'pointerup') action(p.k);
+}
+stage.addEventListener('pointerup', endPress);
+stage.addEventListener('pointercancel', endPress);
+stage.addEventListener('pointerleave', () => { if (!press) { setCursor(''); if (hover) { hover = false; retarget(); } } });
+function action(k) {
+  if (pv) { clearPreview(); toIdle(); return; }
+  if (state === 'idle') { startRec(); return; }
+  if (state === 'rec') {
+    if (k === 'cancel') return cancel();
+    if (k === 'ok') return finish();
+    if (k === 'dot' && S.live !== 'off') return togglePanel();
+    return finish();
+  }
+  if (state === 'done') { if (lastText && ENV.copy) { ENV.copy(lastText); doneTxt.textContent = 'Скопировано'; retarget(); clearTimeout(idleT); idleT = setTimeout(toIdle, 1400); } else toIdle(); return; }
+  if (state === 'err') {
+    const a = errAct;
+    if (a === 'retry' && lastAudio) return retry();
+    if ((a === 'key' || a === 'mic') && ENV.openSettings) ENV.openSettings(a === 'key' ? 'key' : 'control');
+    toIdle();
+  }
+}
+pc.addEventListener('click', e => {
+  const b = e.target.closest('[data-k]'); if (!b) return;
+  if (b.dataset.k === 'insert') insert(lText.innerText);
+  if (b.dataset.k === 'copy') {
+    const t = lText.innerText.trim();
+    Promise.resolve(ENV.copy ? ENV.copy(t) : navigator.clipboard.writeText(t)).then(() => { b.textContent = 'Скопировано'; setTimeout(() => { b.textContent = 'Копировать'; }, 1400); }, () => {});
+  }
+});
+lText.addEventListener('pointerdown', () => { if (state === 'review' && OVERLAY && !editing) { setEditing(true); setTimeout(() => lText.focus({ preventScroll: true }), 60); } });
+lText.addEventListener('keydown', e => {
+  if (state !== 'review') return;
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); insert(lText.innerText); }
+  else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+  e.stopPropagation();
+});
+lText.addEventListener('input', () => { if (state === 'review') { const n = wc(lText.innerText); lCnt.textContent = n ? words_(n) : ''; updatePanel(); } });
+window.addEventListener('blur', () => { if (OVERLAY && editing) setEditing(false); });
+
 /* ---------------- hotkey (events come from the keyboard hook of the app) */
 let held = false, hkT = 0;
 const canStart = () => ['idle', 'done', 'err'].includes(state);

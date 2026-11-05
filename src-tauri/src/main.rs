@@ -4,10 +4,13 @@
 mod hook;
 mod logx;
 mod paste;
+mod setup;
+mod sys;
+mod upd;
 mod win;
 
 use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use serde_json::json;
@@ -23,6 +26,8 @@ const ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtecti
 static OVL: AtomicIsize = AtomicIsize::new(0);
 static FOCUSED: AtomicBool = AtomicBool::new(false);
 static HITS: Mutex<Vec<[i32; 4]>> = Mutex::new(Vec::new());
+/// started by an update: the version it updated to (the settings say «Обновлено до …»)
+static UPDATED: OnceLock<String> = OnceLock::new();
 
 fn ovl() -> windows::Win32::Foundation::HWND {
   win::hwnd_of(OVL.load(Ordering::SeqCst))
@@ -134,7 +139,31 @@ fn app_info(app: AppHandle) -> serde_json::Value {
     "version": app.package_info().version.to_string(),
     "autostart": win::autostart_get(),
     "logs": logx::dir().map(|d| d.display().to_string()).unwrap_or_default(),
+    "updated": UPDATED.get().cloned().unwrap_or_default(),
+    "installed": setup::installed_dir().is_some(),
   })
+}
+
+/// is there a newer version (the signed manifest of the download page)
+#[tauri::command]
+async fn upd_check(app: AppHandle) -> Result<serde_json::Value, String> {
+  let cur = app.package_info().version.to_string();
+  tauri::async_runtime::spawn_blocking(move || {
+    upd::check().map(|m| {
+      json!({ "version": m.version, "notes": m.notes, "size": m.size, "url": m.url, "newer": upd::newer(&m.version, &cur),
+        "can": !m.sha256.is_empty() && !m.sig.is_empty() && !m.url.is_empty() })
+    })
+  })
+  .await
+  .map_err(|e| e.to_string())?
+}
+
+/// download, check, replace, restart (progress comes as «upd» events)
+#[tauri::command]
+fn upd_install(app: AppHandle) {
+  std::thread::spawn(move || {
+    let _ = upd::install(app);
+  });
 }
 
 #[tauri::command]
@@ -244,11 +273,55 @@ fn overlay_loop(app: AppHandle) {
 }
 
 fn main() {
-  let autostarted = std::env::args().any(|a| a == "--autostart");
+  let args: Vec<String> = std::env::args().collect();
+  // helpers started with administrator rights for a folder like Program Files: copy, then quit (no window)
+  if let Some(t) = setup::arg_after(&args, "--apply-update") {
+    std::process::exit(upd::apply_elevated(&t));
+  }
+  if let Some(d) = setup::arg_after(&args, "--install-files") {
+    std::process::exit(setup::install_files_elevated(&d));
+  }
+  logx::init(sys::local_appdata().join("com.retocker.absolute").join("logs"));
   std::panic::set_hook(Box::new(|p| logx::log(&format!("panic: {p}"))));
+  // after an update the new copy starts while the old one is still quitting: wait for it
+  if let Some(pid) = setup::arg_after(&args, "--wait-pid").and_then(|s| s.parse::<u32>().ok()) {
+    let gone = sys::wait_pid(pid, 20000);
+    logx::log(&format!("waited for the old copy ({pid}): {}", if gone { "gone" } else { "still there" }));
+  }
+  if let Some(v) = setup::arg_after(&args, "--updated") {
+    let _ = UPDATED.set(v);
+  }
+  let ctx = tauri::generate_context!();
+  let ver = ctx.package_info().version.to_string();
+  let mode = setup::mode(&args);
+  if mode != setup::Mode::App && args.iter().any(|a| a == "--silent" || a == "/S") {
+    std::process::exit(setup::silent(mode, &ver, &args));
+  }
+  if !sys::webview2_ensure() {
+    std::process::exit(1);
+  }
+  if mode != setup::Mode::App {
+    logx::log(&format!("{mode:?} v{ver}"));
+    setup::run_ui(mode, ctx);
+    return;
+  }
+  upd::cleanup_old();
+  run_app(ctx, args.iter().any(|a| a == "--autostart"));
+}
 
+fn run_app(ctx: tauri::Context<tauri::Wry>, autostarted: bool) {
   tauri::Builder::default()
     .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+      // RA_DEBUG only (the build check): a second start with --test-update updates from RA_UPDATE_URL
+      if args.iter().any(|a| a == "--test-update") && std::env::var("RA_DEBUG").map(|v| v == "1").unwrap_or(false) {
+        let a = app.clone();
+        std::thread::spawn(move || {
+          let r = upd::check();
+          logx::log(&format!("test update: manifest {:?}", r.as_ref().map(|m| m.version.clone())));
+          let _ = upd::install(a);
+        });
+        return;
+      }
       // RA_DEBUG only (the build check): a second start with --test-keys plays key events through the hook logic
       if let Some(i) = args.iter().position(|a| a == "--test-keys") {
         if hook::debug() {
@@ -261,14 +334,14 @@ fn main() {
     }))
     .invoke_handler(tauri::generate_handler![
       set_hotkey, set_keys, hk_record, set_paused, set_hit, paste, copy_text, fg_app, focus_overlay, show_settings, quit,
-      app_info, autostart, open_url, open_logs, log, win_ctl
+      app_info, autostart, open_url, open_logs, log, win_ctl, upd_check, upd_install
     ])
     .setup(move |app| {
       let h = app.handle().clone();
       if let Ok(d) = app.path().app_local_data_dir() {
         logx::init(d.join("logs"));
       }
-      logx::log(&format!("start v{} autostart={autostarted}", app.package_info().version));
+      logx::log(&format!("start v{} autostart={autostarted} updated={}", app.package_info().version, UPDATED.get().map(|s| s.as_str()).unwrap_or("")));
       win::autostart_migrate();
 
       // the capsule: a transparent layer over the whole work area that lets clicks through except on the capsule
@@ -369,6 +442,6 @@ fn main() {
       }
       Ok(())
     })
-    .run(tauri::generate_context!())
+    .run(ctx)
     .expect("Retocker Voice could not start");
 }
