@@ -1,4 +1,4 @@
-# Retocker Absolute
+# Retocker Voice
 
 Диктовка для Windows: зажал клавишу, сказал — текст появился там, где стоит курсор.
 
@@ -21,3 +21,7 @@
 Для всех файлы лежат в публичном хранилище `retocker-absolute-download` (только exe, без кода): Firebase на
 бесплатном тарифе не принимает exe. Страница скачивания и `latest.json` (по нему программа узнаёт о новой
 версии) — на https://retocker-voice.web.app/absolute/, ссылки ведут на `releases/latest/download/…`.
+
+До 1.0.15 программа называлась Retocker Absolute. Поэтому `identifier` остался `com.retocker.absolute` (там лежат
+настройки и ключ), а установщик (`src-tauri/installer-hooks.nsh`) тихо удаляет старую копию; автозапуск переносится
+на новое имя при первом старте (`win::autostart_migrate`).

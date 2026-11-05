@@ -30,9 +30,6 @@
 .stage.grab .cc button{cursor:pointer!important}
 .stage.grab .cc:not([data-live=tap]) .c-dot{cursor:grab!important}
 /* «panel out of the dot»: while it grows or shrinks it lies on top of the capsule */
-.stage[data-pd="1"] #pShd{z-index:13}
-.stage[data-pd="1"] #pSvg{z-index:14}
-.stage[data-pd="1"] .pc{z-index:15}
 
 .g-mini{gap:2px;height:18px}
 .g-mini i{width:2px;border-radius:1px;background:var(--wave);opacity:.55}
@@ -50,16 +47,17 @@
 .cc .c-x svg,.cc .c-ok svg{width:13px;height:13px;stroke-width:2.2}
 .c-dot{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;flex:none;position:relative;transition:background-color .15s}
 .cc[data-live=tap] .c-dot:hover{background:var(--c-btn)}
-.cc[data-live=tap][data-pd="1"] .c-dot:hover{background:none}
 .cc:not([data-live=tap]) .c-dot{cursor:inherit}
 .c-dot i,.c-dot b{grid-area:1/1;width:9px;height:9px;border-radius:50%;background:var(--acc)}
 .c-dot i{box-shadow:0 0 10px var(--dotglow)}
-.cc[data-pd="1"] .c-dot i{opacity:0}
 .c-dot b{opacity:0;background:color-mix(in srgb,var(--acc) 28%,transparent)}
 .cc[data-wave=pulse] .c-dot b{opacity:1}
-.cc[data-wave=pulse][data-pd="1"] .c-dot b{opacity:0}
 .c-dot::after{content:'';position:absolute;left:50%;top:50%;width:19px;height:19px;margin:-9.5px 0 0 -9.5px;border-radius:50%;box-shadow:0 0 0 1.5px color-mix(in srgb,var(--acc) 50%,transparent);opacity:0;transform:scale(.55);transition:opacity .18s ease,transform .34s cubic-bezier(.3,1.45,.5,1)}
 .cc[data-open="1"]:not([data-pdot="1"]) .c-dot::after{opacity:1;transform:none}
+/* «Точка растёт»: while the panel is open the dot itself grows to the size of the ring (instead of the ring) */
+.c-dot i,.c-dot b{transition:scale .38s cubic-bezier(.3,1.35,.5,1)}
+.cc[data-open="1"][data-pdot="1"] .c-dot i,.cc[data-open="1"][data-pdot="1"] .c-dot b{scale:1.9}
+.cc[data-live=tap][data-open="1"][data-pdot="1"] .c-dot:hover{background:none}
 .c-wave{display:block;height:24px;flex:none}
 .c-time{font-size:12px;font-weight:600;color:var(--c-tx2);font-variant-numeric:tabular-nums;min-width:30px;text-align:center;flex:none}
 .cc:not([data-timer="1"]) .c-time,.cc:not([data-btns="1"]) .c-x,.cc:not([data-btns="1"]) .c-ok,.cc[data-wave=pulse] #recC{display:none}

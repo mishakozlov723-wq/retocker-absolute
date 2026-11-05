@@ -1,8 +1,8 @@
 [package]
-name = "retocker-absolute"
+name = "retocker-voice"
 version = "1.0.0"
 edition = "2021"
-description = "Retocker Absolute"
+description = "Retocker Voice"
 authors = ["Retocker"]
 
 [build-dependencies]

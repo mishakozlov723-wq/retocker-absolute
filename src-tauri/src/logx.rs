@@ -8,10 +8,10 @@ static LOCK: Mutex<()> = Mutex::new(());
 
 pub fn init(dir: PathBuf) {
   let _ = std::fs::create_dir_all(&dir);
-  let p = dir.join("retocker-absolute.log");
+  let p = dir.join("retocker-voice.log");
   // keep it small: start over when it grows past 1 MB
   if std::fs::metadata(&p).map(|m| m.len() > 1_000_000).unwrap_or(false) {
-    let _ = std::fs::rename(&p, dir.join("retocker-absolute.old.log"));
+    let _ = std::fs::rename(&p, dir.join("retocker-voice.old.log"));
   }
   let _ = PATH.set(p);
 }

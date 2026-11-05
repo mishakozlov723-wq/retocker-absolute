@@ -68,7 +68,7 @@ function Shot($n) {
 function Key($vk, $scan, $flags) { [W]::keybd_event([byte]$vk, [byte]$scan, [uint32]$flags, [UIntPtr]::Zero) }
 function Click($x, $y) { [W]::SetCursorPos($x, $y) | Out-Null; Start-Sleep -Milliseconds 120; [W]::mouse_event(2, 0, 0, 0, [UIntPtr]::Zero); Start-Sleep -Milliseconds 60; [W]::mouse_event(4, 0, 0, 0, [UIntPtr]::Zero) }
 
-$exe = (Resolve-Path "src-tauri/target/release/retocker-absolute.exe").Path
+$exe = (Resolve-Path "src-tauri/target/release/retocker-voice.exe").Path
 Log "exe: $exe ($((Get-Item $exe).Length) bytes)"
 $env:RA_DEBUG = '1'
 $p = Start-Process $exe -PassThru
@@ -79,7 +79,7 @@ Log "foreground: $([W]::Title([W]::GetForegroundWindow()))"
 Shot "01-start"
 
 # the settings window: every page once, and a few states in the preview
-$h = [W]::FindWindow([NullString]::Value, 'Retocker Absolute')
+$h = [W]::FindWindow([NullString]::Value, 'Retocker Voice')
 $r = New-Object W+RECT
 [W]::GetWindowRect($h, [ref]$r) | Out-Null
 $wx = $r.L; $wy = $r.T
@@ -140,7 +140,7 @@ Start-Sleep 3
 Log "after a second start: settings visible=$([W]::IsWindowVisible($h))"
 Shot "07-second-start"
 
-$logf = Join-Path $env:LOCALAPPDATA "com.retocker.absolute\logs\retocker-absolute.log"
+$logf = Join-Path $env:LOCALAPPDATA "com.retocker.absolute\logs\retocker-voice.log"
 Log "---- app log"
 if (Test-Path $logf) { Get-Content $logf | ForEach-Object { Log $_ } } else { Log "no log at $logf" }
 if ($p.HasExited) { Log "APP EXITED, code $($p.ExitCode)"; exit 1 }
