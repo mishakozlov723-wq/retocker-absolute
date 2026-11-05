@@ -2,7 +2,7 @@
 //! It knows the dictation hotkey (any combo, also modifiers only, e.g. Ctrl+Win), swallows the main key of a
 //! combo so the app under the cursor never sees it, catches Esc / Enter while the capsule waits for them, and
 //! can record a new hotkey for the settings window (then every key goes only to us, so Win never opens Start).
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -234,9 +234,36 @@ unsafe extern "system" fn proc_(code: i32, wp: WPARAM, lp: LPARAM) -> LRESULT {
   CallNextHookEx(None, code, wp, lp)
 }
 
+pub fn debug() -> bool {
+  DEBUG.load(Ordering::Relaxed)
+}
+
+/// RA_DEBUG only: made-up key events through the same logic as real ones, e.g. "A2+,5B+" then "5B-,A2-"
+pub fn test_keys(spec: &str) {
+  for t in spec.split(',').map(|t| t.trim()).filter(|t| t.len() > 1) {
+    let (h, d) = t.split_at(t.len() - 1);
+    let Ok(vk) = u32::from_str_radix(h, 16) else { continue };
+    let down = d == "+";
+    let scan = unsafe { MapVirtualKeyW(vk, MAPVK_VK_TO_VSC) };
+    let mut fl = if matches!(vk, 0x5B | 0x5C | 0xA3 | 0xA5) { LLKHF_EXTENDED.0 } else { 0 };
+    if !down {
+      fl |= LLKHF_UP.0;
+    }
+    let kb = KBDLLHOOKSTRUCT { vkCode: vk, scanCode: scan, flags: KBDLLHOOKSTRUCT_FLAGS(fl), time: 0, dwExtraInfo: 0 };
+    let sw = handle(if down { WM_KEYDOWN } else { WM_KEYUP }, &kb);
+    crate::logx::log(&format!("test key {t} swallowed={sw}"));
+    std::thread::sleep(Duration::from_millis(60));
+  }
+}
+
+static SEEN: AtomicU32 = AtomicU32::new(0);
+
 /// true = swallow the event
 fn handle(msg: u32, kb: &KBDLLHOOKSTRUCT) -> bool {
   let down = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
+  if SEEN.fetch_add(1, Ordering::Relaxed) == 0 {
+    send(Ev::Dbg("keyboard hook: the first key arrived".into()));
+  }
   let r = handle_(down, kb);
   dbg(|| {
     let s = st();
@@ -390,6 +417,9 @@ fn sync_held(s: &mut St, cur: u8) {
 /// Starts the hook thread; `on_ev` runs on a separate dispatcher thread (never inside the hook).
 pub fn start(on_ev: impl Fn(Ev) + Send + 'static) {
   DEBUG.store(std::env::var("RA_DEBUG").map(|v| v == "1").unwrap_or(false), Ordering::Relaxed);
+  if debug() {
+    crate::logx::log("debug log on (RA_DEBUG=1)");
+  }
   let (tx, rx) = channel::<Ev>();
   let _ = TX.set(Mutex::new(tx));
   std::thread::spawn(move || {
