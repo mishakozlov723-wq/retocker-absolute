@@ -118,6 +118,14 @@ function preview(kind) {
   } else if (kind === 'live') {
     startRec({ preview: true, panel: true, loop: false });
     T(4600, end);
+  } else if (kind === 'fix') {
+    // the final text over the live one: what stays glides, only the changed letters re-write themselves
+    startRec({ preview: true, panel: true, words: false, loop: true });
+    const raw = 'смотри сегодня биткоин пробил сопротивление на ста двадцати тысячах я думаю зайти в лонг на откате стоп поставлю под вчерашним минимумом а тейк на ста тридцати'.split(' ');
+    raw.forEach((_, i) => T(300 + i * 75, () => { if (state === 'rec') voskText(raw.slice(0, i + 1).join(' ')); }));
+    T(300 + raw.length * 75 + 500, () => { if (state !== 'rec') return; endRec(); setState('proc'); });
+    T(300 + raw.length * 75 + 900, () => { if (state === 'proc') fixText('Смотри, сегодня биткоин пробил сопротивление на 120 000. Я думаю зайти в лонг на откате: стоп поставлю под вчерашним минимумом, а тейк — на 130 000.'); });
+    T(300 + raw.length * 75 + 3600, end);
   } else if (kind === 'dot') {
     // the panel opens out of the dot and closes back into it
     startRec({ preview: true, loop: true });

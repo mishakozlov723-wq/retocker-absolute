@@ -10,6 +10,8 @@
     timer: true, btns: false, proc: 'shimmer', sounds: false,
     // live text
     live: 'tap', pdot: false, reveal: 'letters', fs: 15, pw: 420,
+    // the local speech model (when it is downloaded): words at once; the colour of the corrections afterwards
+    fast: true, fixc: 'blue',
     // after speech
     review: false, clean: true, smart: true,
     // control
@@ -27,6 +29,8 @@
     { id: 'min', name: 'Минимум', v: { acc: '#a8a8a8', wcol: 'gray', glow: 0, anim: 'fade', idle: 'dot', idleOp: 70, hint: false, wave: 'pulse', timer: false, live: 'off', proc: 'ring', reveal: 'fade' } }
   ].map(p => ({ ...p, v: { ...BASE, ...p.v } }));
   const BGS = [['graphite', '#1f1f1f', 'Графит'], ['coal', '#0c0c0c', 'Уголь'], ['glass', null, 'Стекло'], ['light', '#f2f2f0', 'Светлый']];
+  // the colour corrected words flash in when the final text comes: [id, on a dark panel, on a light one, name]
+  const FIXC = [['blue', '#9cc3ff', '#2f6fd0', 'Голубой'], ['mint', '#8fe0b8', '#1f8f5c', 'Мята'], ['amber', '#ffd27a', '#b57800', 'Янтарь'], ['lilac', '#c9b3ff', '#6b4fd0', 'Лаванда'], ['rose', '#ffa8c8', '#c0396f', 'Роза'], ['acc', null, null, 'Как акцент'], ['off', null, null, 'Без подсветки']];
   const ACCS = [['#ffffff', 'Белый'], ['#a8a8a8', 'Серебро'], ['#d9c7a7', 'Песок'], ['#7fd1ae', 'Мята'], ['#7fb4f0', 'Небо'], ['#b49cf0', 'Лаванда'], ['#f09cc0', 'Роза'], ['#f0b46a', 'Янтарь'], ['#f08a7a', 'Коралл']];
 
   function load() {
@@ -80,12 +84,47 @@
   function contrast(a, b) { const x = lum(a), y = lum(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); }
   const hexA = (h, a) => `rgba(${rgb(h).join(',')},${a})`;
 
+  // the raw sound for the local model: 16 kHz, 16-bit pieces of 0.1 s from a microphone source node.
+  // onpcm(Int16Array) is called for every piece; returns the node (disconnect it to stop)
+  const TAPW = `registerProcessor('ra-tap', class extends AudioWorkletProcessor {
+    constructor() { super(); this.r = sampleRate / 16000; this.acc = 0; this.n = 0; this.pos = 0; this.out = new Int16Array(1600); this.o = 0; }
+    process(inp) {
+      const c = inp[0] && inp[0][0]; if (!c) return true;
+      for (let i = 0; i < c.length; i++) {
+        this.acc += c[i]; this.n++; this.pos += 1;
+        if (this.pos >= this.r) {
+          this.pos -= this.r;
+          const v = Math.max(-1, Math.min(1, this.acc / this.n)); this.acc = 0; this.n = 0;
+          this.out[this.o++] = v < 0 ? v * 32768 : v * 32767;
+          if (this.o === this.out.length) { this.port.postMessage(this.out, [this.out.buffer]); this.out = new Int16Array(1600); this.o = 0; }
+        }
+      }
+      return true;
+    }
+  });`;
+  const tapMods = new WeakMap();
+  async function pcmTap(ctx, src, onpcm) {
+    if (!tapMods.has(ctx)) tapMods.set(ctx, ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([TAPW], { type: 'application/javascript' }))));
+    await tapMods.get(ctx);
+    const node = new AudioWorkletNode(ctx, 'ra-tap', { numberOfInputs: 1, numberOfOutputs: 0, channelCount: 1, channelCountMode: 'explicit' });
+    node.port.onmessage = e => onpcm(e.data);
+    src.connect(node);
+    return node;
+  }
+  // one piece to the model: the recording's id first, then the samples (sent as raw bytes, not JSON)
+  function asrFeed(id, pcm) {
+    const b = new Uint8Array(4 + pcm.byteLength);
+    new DataView(b.buffer).setUint32(0, id, true);
+    b.set(new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength), 4);
+    return invoke('asr_feed', b).catch(() => {});
+  }
+
   const T = window.__TAURI__;
   const invoke = (cmd, args) => T ? T.core.invoke(cmd, args) : Promise.reject(new Error('no tauri'));
   const listen = (ev, fn) => T ? T.event.listen(ev, fn) : Promise.resolve(() => {});
   const emitTo = (label, ev, p) => T ? T.event.emitTo(label, ev, p === undefined ? null : p).catch(() => {}) : Promise.resolve();
   const log = m => { try { invoke('log', { msg: String(m) }).catch(() => {}); } catch (e) {} };
 
-  window.RA = { KEY, DEF, PK, PRESETS, BGS, ACCS, load, save, AUTH, auth, setAuth, isProxy, hasKey, STATS, stats, addStat, dayKey,
+  window.RA = { KEY, DEF, PK, PRESETS, BGS, ACCS, FIXC, pcmTap, asrFeed, load, save, AUTH, auth, setAuth, isProxy, hasKey, STATS, stats, addStat, dayKey,
     pl, words_, wc, esc, hkPart, hkParts, hkLabel, isModOnly, rgb, lum, contrast, hexA, invoke, listen, emitTo, log, tauri: !!T };
 })();

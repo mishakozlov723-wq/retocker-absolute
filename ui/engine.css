@@ -116,3 +116,10 @@
 .lt .w.ph{opacity:.5;filter:blur(5px);user-select:none;pointer-events:none;transition:none}
 .lt .ch{animation:cIn calc(.3s / var(--k)) ease-out both}
 @keyframes cIn{from{opacity:0}}
+/* the final text over the live one (fixText): letters as their own boxes while they move; the last live words still being decided; a faint light passing */
+.lt{--c-fix:#9cc3ff}
+.lt .w .c{display:inline-block;white-space:pre}
+.lt .w.tent{opacity:.6}
+.lt .fixsweep{position:absolute;top:-4px;bottom:-4px;left:0;width:45%;pointer-events:none;background:linear-gradient(100deg,transparent,rgba(255,255,255,.055) 45%,rgba(255,255,255,.08) 50%,rgba(255,255,255,.055) 55%,transparent);border-radius:8px}
+.lt .fixsweep.on-light{background:linear-gradient(100deg,transparent,rgba(0,0,0,.035) 45%,rgba(0,0,0,.05) 50%,rgba(0,0,0,.035) 55%,transparent)}
+

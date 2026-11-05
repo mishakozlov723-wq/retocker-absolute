@@ -16,6 +16,19 @@
   }
   const appName = a => (a && (a.name || a.exe || '').trim()) || '';
 
+  // «Мгновенный живой текст»: the local model (downloaded in the settings) hears the raw sound and answers at once
+  let locOk = false, locId = 0, locCb = null;
+  const locCheck = () => invoke('asr_status').then(st => {
+    locOk = !!st.installed;
+    if (locOk && RA.load().fast) invoke('asr_warm').catch(() => {});
+  }).catch(() => {});
+  const local = {
+    on: () => locOk && RA.load().fast,
+    start: cb => { const id = ++locId; locCb = cb; invoke('asr_start', { id }).then(ok => { if (!ok) { locOk = false; log('asr: not installed'); } }).catch(() => {}); return id; },
+    feed: (id, pcm) => { if (id === locId) RA.asrFeed(id, pcm); },
+    finish: id => invoke('asr_finish', { id })
+  };
+
   window.RA_ENV = {
     mode: 'overlay',
     stage: document.getElementById('stage'),
@@ -35,6 +48,7 @@
     check: () => (RA.auth().vk ? '' : 'Нет ключа Groq'),
     onChange: S => syncHotkey(S),
     onState: s => { if (s !== lastState) { lastState = s; log('state ' + s); } },
+    local,
     recognize: (blob, o) => window.VOICE.recognize(blob, o),
     polish: text => window.VOICE.polish(text),
     ready: api => {
@@ -44,7 +58,10 @@
       listen('key', e => cap.key(e.payload.k));
       listen('hit', e => cap.hitInside(!!e.payload.inside));
       listen('fs', e => cap.setHidden(!!e.payload.on));
-      listen('cfg', () => { cap.reload(); syncHotkey(cap.S); });
+      listen('cfg', () => { cap.reload(); syncHotkey(cap.S); locCheck(); });
+      listen('asr', e => { const p = e.payload || {}; if (p.id === locId && locCb) locCb(p.text || ''); });
+      listen('asr_dl', e => { if (e.payload && e.payload.state === 'done') locCheck(); });
+      locCheck();
       addEventListener('storage', e => { if (e.key === RA.KEY) syncHotkey(RA.load()); });
       log(`capsule up ${innerWidth}x${innerHeight} dpr ${devicePixelRatio} hk ${api.S.hk} ${api.S.mode}`);
     }
