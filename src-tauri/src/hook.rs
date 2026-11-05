@@ -2,14 +2,21 @@
 //! It knows the dictation hotkey (any combo, also modifiers only, e.g. Ctrl+Win), swallows the main key of a
 //! combo so the app under the cursor never sees it, catches Esc / Enter while the capsule waits for them, and
 //! can record a new hotkey for the settings window (then every key goes only to us, so Win never opens Start).
+use std::cell::RefCell;
+use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-use windows::Win32::Foundation::{HINSTANCE, LPARAM, LRESULT, WPARAM};
+use windows::core::w;
+use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Input::KeyboardAndMouse::*;
+use windows::Win32::UI::Input::{
+  GetRawInputData, RegisterRawInputDevices, HRAWINPUT, RAWINPUT, RAWINPUTDEVICE, RAWINPUTHEADER, RIDEV_INPUTSINK, RID_INPUT,
+  RIM_TYPEKEYBOARD,
+};
 use windows::Win32::UI::WindowsAndMessaging::*;
 
 /// dwExtraInfo of every key event we inject ourselves (paste, typing, menu mask) — the hook lets them through.
@@ -226,13 +233,154 @@ pub fn set_paused(on: bool) {
 
 unsafe extern "system" fn proc_(code: i32, wp: WPARAM, lp: LPARAM) -> LRESULT {
   if code == HC_ACTION as i32 {
-    LAST_KEY.store(now_ms(), Ordering::Relaxed);
+    let now = now_ms();
+    LAST_KEY.store(now, Ordering::Relaxed);
+    if SEEN.fetch_add(1, Ordering::Relaxed) == 0 {
+      send(Ev::Dbg("keyboard hook: the first key arrived".into()));
+    }
     let kb = &*(lp.0 as *const KBDLLHOOKSTRUCT);
-    if !(kb.flags.0 & LLKHF_INJECTED.0 != 0 && kb.dwExtraInfo == MARK) && handle(wp.0 as u32, kb) {
-      return LRESULT(1);
+    if !(kb.flags.0 & LLKHF_INJECTED.0 != 0 && kb.dwExtraInfo == MARK) {
+      if handle(wp.0 as u32, kb) {
+        return LRESULT(1);
+      }
+      // let through: its raw input copy will come next and must not count twice
+      let up = kb.flags.0 & LLKHF_UP.0 != 0;
+      heard(norm_vk(kb.vkCode, kb.scanCode, kb.flags.0 & LLKHF_EXTENDED.0 != 0), up, now);
     }
   }
   CallNextHookEx(None, code, wp, lp)
+}
+
+/// Ctrl / Alt / Shift as left or right keys (raw input and some injected keys only say "Ctrl")
+fn norm_vk(vk: u32, scan: u32, ext: bool) -> u32 {
+  match vk {
+    0x11 => if ext { 0xA3 } else { 0xA2 },
+    0x12 => if ext { 0xA5 } else { 0xA4 },
+    0x10 => if scan & 0xFF == 0x36 { 0xA1 } else { 0xA0 },
+    v => v,
+  }
+}
+
+// keys the hook let through, oldest first, so their raw input copies can be skipped
+thread_local! {
+  static HEARD: RefCell<VecDeque<(u32, u64)>> = RefCell::new(VecDeque::new());
+}
+fn heard(vk: u32, up: bool, now: u64) {
+  HEARD.with(|h| {
+    let mut h = h.borrow_mut();
+    if h.len() >= 32 {
+      h.pop_front();
+    }
+    h.push_back((vk | if up { 0x1_0000 } else { 0 }, now));
+  });
+}
+/// true = the hook already had this key (same key, same direction, in the last 2 s); it and anything older is dropped
+fn was_heard(vk: u32, up: bool, now: u64) -> bool {
+  let k = vk | if up { 0x1_0000 } else { 0 };
+  HEARD.with(|h| {
+    let mut h = h.borrow_mut();
+    while h.front().is_some_and(|e| e.1 + 2000 < now) {
+      h.pop_front();
+    }
+    match h.iter().position(|e| e.0 == k) {
+      Some(i) => {
+        h.drain(..=i);
+        true
+      }
+      None => false,
+    }
+  })
+}
+
+static RAW_N: AtomicU32 = AtomicU32::new(0);
+static REHOOK_AT: AtomicU64 = AtomicU64::new(0);
+
+/// Backup for the hook: every key also comes here as raw input. Keys the hook already had are skipped; a key
+/// it never heard (Windows dropped the hook, or a remote / virtual desktop doesn't feed it) goes through the
+/// same logic here, and the hook is set up again. Raw input can't hold a key back, so then the main key of a
+/// combo still reaches the app (modifier-only hotkeys like Ctrl+Win don't need that).
+unsafe extern "system" fn raw_wnd(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
+  if msg == WM_INPUT {
+    raw_key(lp);
+  }
+  DefWindowProcW(h, msg, wp, lp)
+}
+
+unsafe fn raw_key(lp: LPARAM) {
+  let mut ri = RAWINPUT::default();
+  let mut size = std::mem::size_of::<RAWINPUT>() as u32;
+  let n = GetRawInputData(
+    HRAWINPUT(lp.0 as _),
+    RID_INPUT,
+    Some(&mut ri as *mut RAWINPUT as *mut _),
+    &mut size,
+    std::mem::size_of::<RAWINPUTHEADER>() as u32,
+  );
+  if n == 0 || n == u32::MAX || ri.header.dwType != RIM_TYPEKEYBOARD.0 {
+    return;
+  }
+  let k = ri.data.keyboard;
+  if k.ExtraInformation == MARK as u32 || k.VKey == 0 || k.VKey == 0xFF {
+    return;
+  }
+  let ext = k.Flags as u32 & RI_KEY_E0 != 0;
+  let up = k.Flags as u32 & RI_KEY_BREAK != 0;
+  let vk = norm_vk(k.VKey as u32, k.MakeCode as u32, ext);
+  let now = now_ms();
+  if was_heard(vk, up, now) {
+    return;
+  }
+  if RAW_N.fetch_add(1, Ordering::Relaxed) == 0 {
+    send(Ev::Dbg("keyboard hook is silent: using raw input".into()));
+  }
+  dbg(|| format!("raw key vk={vk:02X} (the hook missed it)"));
+  let mut fl = if ext { LLKHF_EXTENDED.0 } else { 0 };
+  if up {
+    fl |= LLKHF_UP.0;
+  }
+  let kb = KBDLLHOOKSTRUCT {
+    vkCode: vk,
+    scanCode: k.MakeCode as u32,
+    flags: KBDLLHOOKSTRUCT_FLAGS(fl),
+    time: 0,
+    dwExtraInfo: k.ExtraInformation as usize,
+  };
+  handle(if up { WM_KEYUP } else { WM_KEYDOWN }, &kb);
+  rehook(now);
+}
+
+/// asks the hook thread to set the hook up again (at most every 5 s)
+fn rehook(now: u64) -> bool {
+  let last = REHOOK_AT.load(Ordering::Relaxed);
+  if last != 0 && now < last + 5000 {
+    return false;
+  }
+  REHOOK_AT.store(now.max(1), Ordering::Relaxed);
+  let tid = HOOK_TID.load(Ordering::Relaxed);
+  if tid != 0 {
+    unsafe {
+      let _ = PostThreadMessageW(tid, WM_REHOOK, WPARAM(0), LPARAM(0));
+    }
+  }
+  true
+}
+
+/// hidden window on the hook thread that gets the raw keyboard input
+unsafe fn raw_window(hmod: HINSTANCE) -> Option<HWND> {
+  let class = w!("RetockerAbsoluteKeys");
+  let wc = WNDCLASSW { lpfnWndProc: Some(raw_wnd), hInstance: hmod, lpszClassName: class, ..Default::default() };
+  RegisterClassW(&wc);
+  match CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, class, w!(""), WS_POPUP, 0, 0, 0, 0, None, None, Some(hmod), None) {
+    Ok(h) => Some(h),
+    Err(e) => {
+      crate::logx::log(&format!("raw input window failed: {e}"));
+      None
+    }
+  }
+}
+unsafe fn raw_register(h: HWND) -> bool {
+  let d = [RAWINPUTDEVICE { usUsagePage: 1, usUsage: 6, dwFlags: RIDEV_INPUTSINK, hwndTarget: h }];
+  RegisterRawInputDevices(&d, std::mem::size_of::<RAWINPUTDEVICE>() as u32).is_ok()
 }
 
 pub fn debug() -> bool {
@@ -262,9 +410,6 @@ static SEEN: AtomicU32 = AtomicU32::new(0);
 /// true = swallow the event
 fn handle(msg: u32, kb: &KBDLLHOOKSTRUCT) -> bool {
   let down = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
-  if SEEN.fetch_add(1, Ordering::Relaxed) == 0 {
-    send(Ev::Dbg("keyboard hook: the first key arrived".into()));
-  }
   let r = handle_(down, kb);
   dbg(|| {
     let s = st();
@@ -432,7 +577,6 @@ pub struct Watch {
   down: bool,
   press: Option<u64>,
   polled: u64,
-  fixed: u64,
   fixes: u32,
 }
 impl Watch {
@@ -452,17 +596,10 @@ impl Watch {
       return;
     }
     self.press = None;
-    if LAST_KEY.load(Ordering::Relaxed) + 250 < p && now > self.fixed + 5000 {
-      self.fixed = now;
+    if LAST_KEY.load(Ordering::Relaxed) + 250 < p && rehook(now) {
       self.fixes += 1;
       if self.fixes <= 20 {
         crate::logx::log("keyboard hook missed a key: setting it up again");
-      }
-      let tid = HOOK_TID.load(Ordering::Relaxed);
-      if tid != 0 {
-        unsafe {
-          let _ = PostThreadMessageW(tid, WM_REHOOK, WPARAM(0), LPARAM(0));
-        }
       }
     }
   }
@@ -506,8 +643,14 @@ pub fn start(on_ev: impl Fn(Ev) + Send + 'static) {
       }
     };
     let mut hook = install();
-    // a steady tick keeps this thread's queue awake
+    let raw = raw_window(hmod);
+    if let Some(h) = raw {
+      let ok = raw_register(h);
+      crate::logx::log(if ok { "raw keyboard input on (backup for the hook)" } else { "raw keyboard input failed" });
+    }
+    // a steady tick keeps this thread's queue awake (and the raw input ours: registering again is harmless)
     let _ = SetTimer(None, 0, 5000, None);
+    let mut rehooks = 0u32;
     let mut m = MSG::default();
     loop {
       let r = GetMessageW(&mut m, None, 0, 0);
@@ -517,8 +660,12 @@ pub fn start(on_ev: impl Fn(Ev) + Send + 'static) {
       }
       if m.hwnd.0.is_null() {
         if m.message == WM_TIMER {
+          if let Some(h) = raw {
+            raw_register(h);
+          }
           if debug() {
-            crate::logx::log(&format!("hook thread alive, keys seen {}", SEEN.load(Ordering::Relaxed)));
+            let (a, b) = (SEEN.load(Ordering::Relaxed), RAW_N.load(Ordering::Relaxed));
+            crate::logx::log(&format!("hook thread alive, keys seen {a}, raw only {b}"));
           }
           continue;
         }
@@ -526,7 +673,12 @@ pub fn start(on_ev: impl Fn(Ev) + Send + 'static) {
           if let Some(h) = hook.take() {
             let _ = UnhookWindowsHookEx(h);
           }
-          hook = install();
+          rehooks += 1;
+          if rehooks <= 20 || debug() {
+            hook = install();
+          } else {
+            hook = SetWindowsHookExW(WH_KEYBOARD_LL, Some(proc_), Some(hmod), 0).ok();
+          }
           continue;
         }
       }

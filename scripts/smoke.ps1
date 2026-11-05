@@ -111,7 +111,7 @@ Key 0x5B 0x5B 3; Start-Sleep -Milliseconds 40; Key 0xA2 0x1D 2
 Start-Sleep -Milliseconds 2500
 Shot "04-released"
 Log "start menu check — foreground: $([W]::Title([W]::GetForegroundWindow()))"
-# once more (if the first press was missed, the watchdog has set the hook up again by now)
+# once more (the raw input backup again, or the hook if setting it up again helped)
 Key 0xA2 0x1D 0; Start-Sleep -Milliseconds 80; Key 0x5B 0x5B 1
 Start-Sleep -Milliseconds 900
 Shot "05-hold-again"
@@ -124,6 +124,12 @@ Key 0xA2 0x1D 0; Start-Sleep -Milliseconds 120
 Log "test hook ($([H]::Info)): system sees LCtrl: $([W]::GetAsyncKeyState(0xA2) -band 0x8000)"
 Key 0xA2 0x1D 2; Start-Sleep -Milliseconds 200
 Log "test hook saw $([H]::Count) key events (2 sent)"
+# now our hook hears the keys as well: the raw input copies must be skipped (one start, not two)
+Key 0xA2 0x1D 0; Start-Sleep -Milliseconds 80; Key 0x5B 0x5B 1
+Start-Sleep -Milliseconds 900
+Shot "05b-hold-hooked"
+Key 0x5B 0x5B 3; Start-Sleep -Milliseconds 40; Key 0xA2 0x1D 2
+Start-Sleep -Milliseconds 1500
 
 # the cross only hides the settings; a second start brings them back
 Click ($wx + 978) ($wy + 17); Start-Sleep -Milliseconds 1200
