@@ -367,7 +367,7 @@ fn rehook(now: u64) -> bool {
 
 /// hidden window on the hook thread that gets the raw keyboard input
 unsafe fn raw_window(hmod: HINSTANCE) -> Option<HWND> {
-  let class = w!("RetockerAbsoluteKeys");
+  let class = w!("RetockerVoiceKeys");
   let wc = WNDCLASSW { lpfnWndProc: Some(raw_wnd), hInstance: hmod, lpszClassName: class, ..Default::default() };
   RegisterClassW(&wc);
   match CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, class, w!(""), WS_POPUP, 0, 0, 0, 0, None, None, Some(hmod), None) {

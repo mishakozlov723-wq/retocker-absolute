@@ -52,6 +52,36 @@ jobs:
         shell: pwsh
         run: ./scripts/smoke.ps1
 
+      - name: Upgrade check (the old Retocker Absolute gets replaced)
+        id: upgrade
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $log = "upgrade.txt"
+          $old = Join-Path $env:RUNNER_TEMP "old-setup.exe"
+          Invoke-WebRequest "https://github.com/mishakozlov723-wq/retocker-absolute-download/releases/download/v1.0.14/Retocker-Absolute-Setup.exe" -OutFile $old
+          Start-Process $old -ArgumentList '/S' -Wait
+          $od = (Get-ItemProperty 'HKCU:\Software\Retocker\Retocker Absolute' -ErrorAction SilentlyContinue).'(default)'
+          "old installed at: $od; exe: $(Test-Path "$od\retocker-absolute.exe")" | Tee-Object -FilePath $log -Append
+          New-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'Retocker Absolute' -Value "`"$od\retocker-absolute.exe`" --autostart" -Force | Out-Null
+          Start-Process "$od\retocker-absolute.exe" -ArgumentList '--autostart'
+          Start-Sleep 5
+          "old running before: $([bool](Get-Process retocker-absolute -ErrorAction SilentlyContinue))" | Tee-Object -FilePath $log -Append
+          $new = (Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1).FullName
+          Start-Process $new -ArgumentList '/S' -Wait
+          Start-Sleep 2
+          $nd = (Get-ItemProperty 'HKCU:\Software\Retocker\Retocker Voice' -ErrorAction SilentlyContinue).'(default)'
+          "old exe left: $(Test-Path "$od\retocker-absolute.exe"); old folder left: $(Test-Path $od); old key left: $(Test-Path 'HKCU:\Software\Retocker\Retocker Absolute')" | Tee-Object -FilePath $log -Append
+          "old running after: $([bool](Get-Process retocker-absolute -ErrorAction SilentlyContinue))" | Tee-Object -FilePath $log -Append
+          "new installed at: $nd; exe: $(Test-Path "$nd\retocker-voice.exe")" | Tee-Object -FilePath $log -Append
+          "start menu: $((Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Retocker" -ErrorAction SilentlyContinue | ForEach-Object Name) -join ', ')" | Tee-Object -FilePath $log -Append
+          Start-Process "$nd\retocker-voice.exe" -ArgumentList '--autostart'
+          Start-Sleep 6
+          $run = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+          "autostart old: $($run.'Retocker Absolute'); new: $($run.'Retocker Voice')" | Tee-Object -FilePath $log -Append
+          "new running: $([bool](Get-Process retocker-voice -ErrorAction SilentlyContinue))" | Tee-Object -FilePath $log -Append
+          Get-Process retocker-voice, retocker-absolute -ErrorAction SilentlyContinue | Stop-Process -Force
+
       - name: Screenshots to the ci-shots branch
         if: always() && steps.smoke.outcome != 'skipped'
         continue-on-error: true
@@ -59,7 +89,7 @@ jobs:
         run: |
           git config user.name "ci"
           git config user.email "ci@users.noreply.github.com"
-          mkdir -p out && cp -r shots smoke.txt out/ 2>/dev/null || true
+          mkdir -p out && cp -r shots smoke.txt upgrade.txt out/ 2>/dev/null || true
           git checkout --orphan ci-shots
           git rm -rf --cached . > /dev/null
           git add -f out
@@ -73,18 +103,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -o pipefail
-          cp src-tauri/target/release/bundle/nsis/*-setup.exe Retocker-Absolute-Setup.exe
-          cp src-tauri/target/release/retocker-absolute.exe Retocker-Absolute-portable.exe
-          gh release create "v$VER" Retocker-Absolute-Setup.exe Retocker-Absolute-portable.exe \
-            --title "Retocker Absolute $VER" --notes-file RELEASE.md 2>&1 | tee -a ci.log
+          cp src-tauri/target/release/bundle/nsis/*-setup.exe Retocker-Voice-Setup.exe
+          cp src-tauri/target/release/retocker-voice.exe Retocker-Voice-portable.exe
+          gh release create "v$VER" Retocker-Voice-Setup.exe Retocker-Voice-portable.exe \
+            --title "Retocker Voice $VER" --notes-file RELEASE.md 2>&1 | tee -a ci.log
 
       - name: Keep the build
         uses: actions/upload-artifact@v4
         with:
-          name: retocker-absolute-${{ env.VER }}
+          name: retocker-voice-${{ env.VER }}
           path: |
             src-tauri/target/release/bundle/nsis/*-setup.exe
-            src-tauri/target/release/retocker-absolute.exe
+            src-tauri/target/release/retocker-voice.exe
           retention-days: 14
 
       - name: Report a failure

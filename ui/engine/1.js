@@ -337,10 +337,16 @@ function draw() {
   hitReport();
 }
 function drawG(g, w, h) {
-  const o = g.op.get(), on = o > .003;
+  let o = g.op.get(), fit;
+  if (g.key === 'hint') {
+    // the hint keeps its size and shows up once the capsule has room for it (no tiny text growing out of the line)
+    const room = Math.min((w - 6) / Math.max(1, (g.tw || w) - 24), (h - 4) / 17);
+    fit = Math.min(1, room);
+    const t = clamp((room - .86) / .14, 0, 1); o *= t * t * (3 - 2 * t);
+  } else fit = Math.min(1, w / (g.tw || w || 1), h / (g.th || h || 1));
+  const on = o > .003;
   if (on !== g.on) { g.on = on; g.el.classList.toggle('on', on); }
   if (!on) return;
-  const fit = Math.min(1, w / (g.tw || w || 1), h / (g.th || h || 1));
   setS(g.el, 'opacity', f3(o));
   setS(g.el, 'transform', `scale(${f4(Math.max(0, fit * g.sc.get()))})`);
   const b = g.bl.get(); setS(g.el, 'filter', b > .05 ? `blur(${f2(b)}px)` : 'none');
@@ -366,7 +372,7 @@ function hitReport() {
 }
 
 /* ---------------- live panel: an SVG shape that grows out of the capsule (or out of the record dot) + its content */
-let pVis = false, pBox = { w: 420, h: 100 }, pT = null, pOpenT = 0, pTok = 0, pDot = false;
+let pVis = false, pBox = { w: 420, h: 100 }, pT = null, pOpenT = 0, pTok = 0;
 function drawPanel() {
   const x = P.x.get(), y = P.y.get(), w = Math.max(0, P.w.get()), h = Math.max(0, P.h.get());
   const r = Math.max(0, Math.min(P.r.get(), w / 2, h / 2)), hb = BW / 2;
@@ -411,16 +417,10 @@ function panelTarget() {
   y = clamp(y, top, SH - TASK - 8 - ph);
   return { x, y, w: pw, h: ph, r: panelRad(), above };
 }
-// the record dot in stage coordinates (the panel grows out of it and shrinks back into it)
-function dotRect() {
-  const b = cDot.getBoundingClientRect(), s = Math.max(b.width, 4);
-  return { x: b.left - SX + b.width / 2 - s / 2, y: b.top - SY + b.height / 2 - s / 2, w: s, h: s, r: s / 2 };
-}
-const dotReady = () => S.pdot && state === 'rec' && GR.rec.on && GR.rec.op.get() > .5;
 function showPanel() { if (!pVis) { pVis = true; pSvg.style.visibility = pShd.style.visibility = 'visible'; pc.style.visibility = 'visible'; pc.removeAttribute('aria-hidden'); } }
 function hidePanel() {
   pVis = false; pSvg.style.visibility = pShd.style.visibility = 'hidden'; pc.style.visibility = 'hidden'; pc.setAttribute('aria-hidden', 'true');
-  P.op.jump(0); PC.op.jump(0); P.k.jump(0); pT = null; pDot = false; stage.dataset.pd = cc.dataset.pd = 0;
+  P.op.jump(0); PC.op.jump(0); P.k.jump(0); pT = null;
 }
 function toPanel(t, mode) {
   const st = sty();
@@ -429,7 +429,7 @@ function toPanel(t, mode) {
   if (mode === 'jump') { P.x.jump(t.x); P.y.jump(t.y); P.w.jump(t.w); P.h.jump(t.h); P.r.jump(t.r); return; }
   const opening = performance.now() < pOpenT;
   const sp = opening || mode === 'open' ? SPR(st.pvd, st.pb) : SPR(.3, .06);
-  if (mode === 'open' && S.anim === 'drop' && !pDot) {
+  if (mode === 'open' && S.anim === 'drop') {
     animate(P.y, t.y, SPR(.34, .24)); animate(P.h, t.h, SPR(.34, .24));
     animate(P.x, t.x, SPR(.5, .18, .05)); animate(P.w, t.w, SPR(.5, .18, .05));
   } else { animate(P.x, t.x, sp); animate(P.y, t.y, sp); animate(P.w, t.w, sp); animate(P.h, t.h, sp); }
@@ -441,24 +441,6 @@ function openPanel() {
   setMode(); showPanel();
   const t = panelTarget(), st = sty(), fresh = P.op.get() < .02;
   pOpenT = performance.now() + st.pvd * 1000 / K();
-  if ((fresh || pDot) && dotReady()) {
-    // the dot itself grows into the panel: same place, same colour, then it turns into the panel background
-    // (opened again while it was shrinking back: it simply turns around from where it is)
-    if (fresh || !pDot) {
-      const d = dotRect();
-      [P.x, P.y, P.w, P.h, P.r, P.k].forEach(v => v.stop());
-      P.x.jump(d.x); P.y.jump(d.y); P.w.jump(d.w); P.h.jump(d.h); P.r.jump(d.r); P.op.jump(1); P.k.jump(1);
-      PC.op.jump(0); PC.dy.jump(t.above ? 6 : -6); PC.bl.jump(st.blur ? 4 : 0);
-    }
-    pDot = true; stage.dataset.pd = cc.dataset.pd = 1;
-    const vd = Math.max(.42, st.pvd * 1.05), sp = SPR(vd, Math.min(.2, st.pb));
-    pT = t; ['x', 'y', 'w', 'h', 'r'].forEach(k => animate(P[k], t[k], sp));
-    animate(P.k, 0, TW(.3, .05, [.3, 0, .3, 1]));
-    animate(PC.op, 1, TW(.28, vd * .55, [.3, 0, .2, 1]));
-    animate(PC.dy, 0, SPR(vd * .8, .1, vd * .5));
-    if (PC.bl.get() > 0) animate(PC.bl, 0, TW(.3, vd * .5));
-    req(); return;
-  }
   P.k.jump(0);
   if (fresh) {
     if (S.anim === 'fade') { P.x.jump(t.x); P.w.jump(t.w); P.h.jump(t.h); P.r.jump(t.r); P.y.jump(t.y + (t.above ? 8 : -8)); P.op.jump(0); }
@@ -480,15 +462,6 @@ function closePanel(instant) {
   if (instant) { [P.x, P.y, P.w, P.h, P.r, P.k, PC.dy, PC.sc, PC.bl].forEach(v => v.stop()); hidePanel(); req(); return; }
   animate(PC.op, 0, TW(.09, 0, [.4, 0, 1, 1]));
   const st = sty();
-  if (pDot && dotReady()) {
-    // shrink back into the dot: the accent colour returns on the way, the real dot takes over at the very end
-    const d = dotRect(), vd = Math.min(.46, Math.max(.36, st.pvd * .9)), sp = SPR(vd, Math.min(.1, st.pb * .5));
-    pT = null;
-    animate(P.x, d.x, sp); animate(P.y, d.y, sp); animate(P.w, d.w, sp); animate(P.h, d.h, sp); animate(P.r, d.r, sp);
-    animate(P.k, 1, TW(.22, vd * .45, [.4, 0, .6, 1])).then(() => { if (my === pTok && !panelOpen) hidePanel(); req(); });
-    return;
-  }
-  if (pDot) { pDot = false; stage.dataset.pd = cc.dataset.pd = 0; P.k.stop(); P.k.jump(0); }
   if (S.anim === 'fade') {
     animate(P.y, P.y.get() + (P.y.get() < D.y ? 6 : -6), SPR(.3, 0));
     animate(P.op, 0, TW(.18)).then(() => { if (my === pTok) hidePanel(); });
