@@ -32,11 +32,12 @@ function addWord(t, meta = {}) {
   const k = K(), still = meta.still;
   el.textContent = t;
   const last = words.length ? words[words.length - 1].el : null;
-  lText.append(el);
+  if (phs.length) lText.insertBefore(el, phs[0].el); else lText.append(el);
   // a word that opens a new line waits a beat, so the panel has already grown when it shows up (no clipped letters)
   const d0 = (!still && panelOpen && last && el.offsetTop > last.offsetTop + 2 ? 110 / k : 0) + (meta.delay || 0);
-  if (S.reveal === 'letters' && !still) el.innerHTML = [...t].map((c, j) => `<span class="ch" style="animation-delay:${Math.round(d0 + j * 22 / k)}ms">${esc(c)}</span>`).join('');
-  if (!still) {
+  if (meta.unblur && !still) el.animate([{ opacity: .5, filter: 'blur(5px)' }, { opacity: 1, filter: 'blur(0px)' }], { duration: 380 / k, delay: meta.delay || 0, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'backwards' });
+  else if (S.reveal === 'letters' && !still) el.innerHTML = [...t].map((c, j) => `<span class="ch" style="animation-delay:${Math.round(d0 + j * 22 / k)}ms">${esc(c)}</span>`).join('');
+  if (!still && !meta.unblur) {
     if (S.reveal === 'words') el.animate([{ opacity: 0, transform: 'translateY(.32em)', filter: 'blur(4px)' }, { opacity: 1, transform: 'none', filter: 'blur(0px)' }], { duration: 420 / k, delay: d0, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'backwards' });
     else if (S.reveal === 'fade') el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 600 / k, delay: d0, easing: 'ease-out', fill: 'backwards' });
   }
@@ -101,14 +102,40 @@ function magic(rm, sw) {
   if (panelOpen) updatePanel();
 }
 // new recognised text: what is the same stays, the changed tail dissolves, new words write themselves in
-function setLiveText(txt) {
+// o.upto — a live answer for the speech recorded before that moment: its placeholders turn into the real words
+function setLiveText(txt, o = {}) {
   const nw = String(txt || '').trim().split(/\s+/).filter(Boolean);
+  const live = o.upto != null;
+  phDrop(live ? o.upto : Infinity);
   const alive = words.filter(w => !w.dead);
   let i = 0; while (i < alive.length && i < nw.length && alive[i].t === nw[i]) i++;
   if (i < alive.length) magic(alive.slice(i), []);
-  const k = K(), n = nw.length - i, step = n > 1 ? Math.min(70, 900 / n) / k : 0;
-  for (let j = 0; i < nw.length; i++, j++) addWord(nw[i], { delay: j * step });
+  const k = K(), n = nw.length - i, step = n > 1 ? (live ? Math.min(40, 500 / n) : Math.min(70, 900 / n)) / k : 0;
+  for (let j = 0; i < nw.length; i++, j++) addWord(nw[i], { delay: j * step, unblur: live });
   updCount();
+}
+// live text placeholders: blurred made-up "words" run along with the voice at once (no waiting for Groq);
+// when the answer comes they are replaced by the real words, which come out of the blur
+function phAdd() {
+  if (phs.length >= 24) return;
+  const L = 'оеаинтсрвлкмдпуяыгзбчйхжшю', n = 2 + Math.floor(Math.random() * 7);
+  let t = ''; for (let i = 0; i < n; i++) t += L[Math.floor(Math.random() * L.length)];
+  const el = document.createElement('span'); el.className = 'w ph'; el.textContent = t; el.setAttribute('aria-hidden', 'true');
+  lText.append(el);
+  el.animate([{ opacity: 0 }, { opacity: .5 }], { duration: 220 / K(), easing: 'ease-out', fill: 'backwards' });
+  phs.push({ el, t: performance.now() });
+  updatePanel(); autoScroll = performance.now() + 700; lBody.scrollTo({ top: lBody.scrollHeight, behavior: 'smooth' });
+}
+// placeholders made before `upto` go away (all of them by default); fade: dissolve instead of vanishing
+function phDrop(upto = Infinity, fade) {
+  const keep = [];
+  for (const p of phs) {
+    if (p.t > upto) { keep.push(p); continue; }
+    if (fade) p.el.animate([{ opacity: .5 }, { opacity: 0 }], { duration: 200 / K(), fill: 'forwards' }).onfinish = () => p.el.remove();
+    else p.el.remove();
+  }
+  phs = keep;
+  if (panelOpen) updatePanel();
 }
 
 /* ---------------- cleaning: every word gets its clean form (c: '' = goes away), then magic() shows the change */
@@ -240,8 +267,9 @@ function endRec() {
   const r = rec; if (!r) return; rec = null;
   clearTimeout(r.pt); clearTimeout(r.mx);
   if (r.w) micClose(r.w);
+  phDrop(Infinity, true);
 }
-function clearText() { lText.getAnimations({ subtree: true }).forEach(a => a.cancel()); lText.contentEditable = 'false'; lText.textContent = ''; words = []; updCount(); lBody.scrollTop = 0; }
+function clearText() { lText.getAnimations({ subtree: true }).forEach(a => a.cancel()); lText.contentEditable = 'false'; lText.textContent = ''; words = []; phs = []; updCount(); lBody.scrollTop = 0; }
 function startRec(o = {}) {
   // nothing to recognise with (no Groq key yet): say so at once instead of after the speech
   const why = OVERLAY && !o.preview && ENV.check ? ENV.check() : '';
@@ -264,22 +292,25 @@ function startRec(o = {}) {
   if (S.live === 'always' || o.panel) setTimeout(() => { if (rec === r && state === 'rec') openPanel(); }, 170 / K());
   return r;
 }
-// live text while speaking: the recording so far goes to Groq every few seconds (only while the text is visible)
+// live text while speaking (only while the text is visible): the recording so far goes to Groq about every 3 s
+// (Groq's free plan allows 20 a minute); after a minute the pauses grow slowly, so long speeches don't eat
+// the hourly audio limit. now — the text was just opened: ask at once (but not more often than once a second)
+const PGAP = 3300;
 function partialLoop(r, now) {
   clearTimeout(r.pt);
-  const el = (performance.now() - r.t0) / 1000, gap = now ? 0 : Math.max(3, el * .35) * 1000 + (r.back || 0);
+  const t = performance.now(), since = t - (r.lastP || -1e9), every = Math.max(PGAP, (t - r.t0) * .055);
+  const gap = !panelOpen || r.busy ? 400 : Math.max(now ? 0 : every - since, 1000 - since, 0) + (r.back || 0);
   r.pt = setTimeout(async () => {
     if (rec !== r || state !== 'rec') return;
     const w = r.w;
-    if (panelOpen && ENV.recognize && w && w.chunks.length > 3 && !r.busy && w.peak > .2) {
-      r.busy = true; r.lastP = performance.now();
-      try {
-        const t = await ENV.recognize(blobOf(w), { partial: true });
-        if (rec === r && state === 'rec' && t != null) { const s = stripHall(t); if (s) setLiveText(s); }
-        r.back = 0;
-      } catch (e) { r.back = e.code === 429 ? Math.min(30000, (r.back || 4000) * 2) : Math.min(15000, (r.back || 2000) * 1.5); }
-      r.busy = false;
-    }
+    if (!panelOpen || !ENV.recognize || !w || w.chunks.length <= 3 || r.busy || w.peak <= .2) { r.pt = setTimeout(() => { if (rec === r) partialLoop(r); }, 300); return; }
+    r.busy = true; const sent = r.lastP = performance.now();
+    try {
+      const txt = await ENV.recognize(blobOf(w), { partial: true });
+      if (rec === r && state === 'rec' && txt != null) { const s = stripHall(txt); if (s) setLiveText(s, { upto: sent - 200 }); }
+      r.back = 0;
+    } catch (e) { r.back = e.code === 429 ? Math.min(30000, (r.back || 4000) * 2) : Math.min(15000, (r.back || 2000) * 1.5); }
+    r.busy = false;
     if (rec === r) partialLoop(r);
   }, gap);
 }
@@ -288,6 +319,7 @@ async function finish() {
   const r = rec, f = ++flow, k = K();
   clearTimeout(r.pt); clearTimeout(r.mx);
   rec = null;
+  phDrop(Infinity, true);
   if (r.real) {
     const dur = (performance.now() - r.t0) / 1000;
     let blob = null, w = null;
@@ -478,7 +510,11 @@ function lvTick(fd) {
   if (state === 'rec' && rec) {
     const r = rec, ms = Math.max(0, now - r.t0);
     let tg;
-    if (r.real) { const raw = micLevel(r.w); tg = raw; if (r.w) { if (raw > r.w.peak) r.w.peak = raw; if (raw > .3) r.w.vox += dt; } }
+    if (r.real) {
+      const raw = micLevel(r.w); tg = raw;
+      if (r.w) { if (raw > r.w.peak) r.w.peak = raw; if (raw > .3) r.w.vox += dt; }
+      if (panelOpen && ENV.recognize && Math.min(1, raw * S.sens / 100) > .3) { r.phv = (r.phv || 0) + dt; if (r.phv >= .35) { r.phv -= .35; phAdd(); } }
+    }
     else tg = simLevel(r.loop ? ms % (r.sim.end + 600) : ms, r.sim);
     if (r.loop && ms % (r.sim.end + 600) < 30) r.sim.i = 0;
     tg = Math.min(1, tg * S.sens / 100);
