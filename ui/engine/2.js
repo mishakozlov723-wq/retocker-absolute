@@ -404,7 +404,7 @@ function startRec(o = {}) {
   if (why) { if (warm) micClose(warm); fail(why, 'key'); return null; }
   clearTimeout(idleT); flow++; endRec();
   closePanel(true);
-  clearText(); setEditing(false);
+  clearText(); setEditing(false); rev1 = false;
   const real = OVERLAY && !o.preview;
   const r = { t0: performance.now(), sim: buildSim(), next: 0, preview: !!o.preview, words: o.words !== false && !real, loop: !!o.loop, real };
   rec = r; hover = false; timeEl.textContent = '0:00';
@@ -507,13 +507,13 @@ async function polishAndGo(f, real, dur = 0, pre = null) {
       }
       if (!done) planLocal();
     }
-    if (panelOpen) { await cleanAnim(f); if (f !== flow) return; if (!S.review) await sleep(real ? 380 : 650 / k); }
+    if (panelOpen) { await cleanAnim(f); if (f !== flow) return; if (!(S.review || rev1)) await sleep(real ? 380 : 650 / k); }
     else if (!real) await sleep(600 / k);
-  } else if (panelOpen && !S.review) await sleep(real ? 300 : 500 / k);
+  } else if (panelOpen && !(S.review || rev1)) await sleep(real ? 300 : 500 / k);
   if (f !== flow) return;
   const list = words.filter(w => !w.dead);
   const text = S.clean ? cleanOf(list) : list.map(w => w.t).join(' ');
-  if (S.review) toReview(text); else insert(text, dur);
+  if (S.review || rev1) toReview(text); else insert(text, dur);
 }
 function retry() {
   if (!lastAudio) { toIdle(); return; }
