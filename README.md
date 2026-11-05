@@ -17,3 +17,7 @@
 Сборка — GitHub Actions (`.github/workflows/build.yml`): установщик NSIS и portable-версия, проверка на
 чистой Windows (`scripts/smoke.ps1`, скриншоты — в ветке `ci-shots`). Коммит с `[release]` в сообщении
 выкладывает релиз.
+
+Для всех файлы лежат в публичном хранилище `retocker-absolute-download` (только exe, без кода): Firebase на
+бесплатном тарифе не принимает exe. Страница скачивания и `latest.json` (по нему программа узнаёт о новой
+версии) — на https://retocker-voice.web.app/absolute/, ссылки ведут на `releases/latest/download/…`.
