@@ -70,7 +70,7 @@ function rng(k, t, min, max, step, fmt, o = {}) {
   top.append(lbl(t, o.sm, o.tip), val);
   const i = h('input', 'rng'); Object.assign(i, { type: 'range', min, max, step });
   const paint = () => { const v = S_()[k]; i.style.setProperty('--p', ((v - min) / (max - min) * 100) + '%'); val.textContent = fmt(v); };
-  i.oninput = () => { cap.opt({ [k]: +i.value }); push(); paint(); };
+  i.oninput = () => { cap.opt({ [k]: +i.value }); push(); paint(); if (o.onin) o.onin(+i.value); };
   i.onchange = () => { refresh(); if (o.pv) cap.preview(o.pv); };
   r.append(top, i); P.append(r);
   UI.push(() => { i.value = S_()[k]; paint(); }); dis(r, o);
@@ -85,6 +85,93 @@ function chips(k, t, opts, n, o = {}) {
   return r;
 }
 
+/* ---------------- a dropdown in the app's style (instead of the system list)
+   the button shows the choice (cut with «…» when long, the full name in its tooltip); the list shows full names
+   (up to two lines) with a tick on the chosen one; mouse, keyboard (↑ ↓ Home End Enter Esc, first letter) */
+let ddOpen = null;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+function dd(o = {}) {
+  const b = h('button', 'dd', '<span class="v"></span><svg viewBox="0 0 16 16"><path d="m4.5 6.5 3.5 3.5 3.5-3.5"/></svg>');
+  b.type = 'button'; b.setAttribute('aria-haspopup', 'listbox'); b.setAttribute('aria-expanded', 'false');
+  if (o.width) b.style.width = o.width;
+  const st = { el: b, items: [], v: '', onchange: o.onchange || (() => {}) };
+  st.paint = () => { const it = st.items.find(i => i.v === st.v) || st.items[0]; b.firstChild.textContent = it ? it.t : ''; b.title = it ? it.t + (it.sub ? ' · ' + it.sub : '') : ''; };
+  st.set = v => { st.v = v; st.paint(); };
+  st.setItems = (items, v) => { st.items = items; if (v !== undefined) st.v = v; st.paint(); if (ddOpen && ddOpen.st === st) { ddRender(); ddPlace(); } };
+  b.onclick = () => (ddOpen && ddOpen.st === st ? ddClose() : ddShow(st));
+  b.onkeydown = e => { if ((!ddOpen || ddOpen.st !== st) && ['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) { e.preventDefault(); ddShow(st); } };
+  return st;
+}
+function ddShow(st) {
+  ddClose(true);
+  const L = h('div', 'ddl'); L.setAttribute('role', 'listbox');
+  document.body.append(L);
+  ddOpen = { st, L, act: Math.max(0, st.items.findIndex(i => i.v === st.v)) };
+  ddRender(); ddPlace();
+  st.el.classList.add('on'); st.el.setAttribute('aria-expanded', 'true');
+  const a = L.children[ddOpen.act]; if (a) a.scrollIntoView({ block: 'nearest' });
+  requestAnimationFrame(() => requestAnimationFrame(() => L.classList.add('on')));
+}
+function ddRender() {
+  const { st, L } = ddOpen;
+  L.innerHTML = '';
+  st.items.forEach((it, i) => {
+    const r = h('div', 'ddi' + (it.v === st.v ? ' sel' : '') + (i === ddOpen.act ? ' act' : ''),
+      `<span class="tx"><span class="t">${esc(it.t)}</span>${it.sub ? `<small>${esc(it.sub)}</small>` : ''}</span><svg viewBox="0 0 16 16"><path d="m3.8 8.4 2.7 2.7 5.7-5.8"/></svg>`);
+    r.setAttribute('role', 'option'); r.title = it.t;
+    r.onpointermove = () => { if (ddOpen && ddOpen.act !== i) ddAct(i, false); };
+    r.onclick = () => ddPick(i);
+    L.append(r);
+  });
+}
+function ddPlace() {
+  const { st, L } = ddOpen, r = st.el.getBoundingClientRect();
+  const w = Math.max(r.width, 260);
+  L.style.width = w + 'px';
+  L.style.left = clamp(r.left, 8, innerWidth - w - 8) + 'px';
+  L.style.maxHeight = '';
+  const want = Math.min(L.scrollHeight + 2, 300), below = innerHeight - r.bottom - 12, above = r.top - 46;
+  const down = below >= want || below >= above;
+  L.style.maxHeight = Math.max(80, Math.min(300, down ? below : above)) + 'px';
+  L.classList.toggle('up', !down);
+  if (down) { L.style.top = (r.bottom + 4) + 'px'; L.style.bottom = ''; } else { L.style.bottom = (innerHeight - r.top + 4) + 'px'; L.style.top = ''; }
+}
+function ddAct(i, scroll) {
+  if (!ddOpen) return;
+  const { L } = ddOpen, n = L.children.length; if (!n) return;
+  i = clamp(i, 0, n - 1); ddOpen.act = i;
+  [...L.children].forEach((c, j) => c.classList.toggle('act', j === i));
+  if (scroll) L.children[i].scrollIntoView({ block: 'nearest' });
+}
+function ddPick(i) {
+  if (!ddOpen) return;
+  const { st } = ddOpen, it = st.items[i];
+  ddClose(); st.el.focus({ preventScroll: true });
+  if (it && it.v !== st.v) { st.v = it.v; st.paint(); st.onchange(it.v); }
+}
+function ddClose(now) {
+  if (!ddOpen) return;
+  const { st, L } = ddOpen; ddOpen = null;
+  st.el.classList.remove('on'); st.el.setAttribute('aria-expanded', 'false');
+  if (now) { L.remove(); return; }
+  L.classList.remove('on'); L.style.pointerEvents = 'none'; setTimeout(() => L.remove(), 160);
+}
+addEventListener('pointerdown', e => { if (ddOpen && !ddOpen.L.contains(e.target) && !ddOpen.st.el.contains(e.target)) ddClose(); }, true);
+addEventListener('keydown', e => {
+  if (!ddOpen) return;
+  const k = e.key, n = ddOpen.st.items.length;
+  if (k === 'Escape' || k === 'Tab') { e.preventDefault(); e.stopPropagation(); const el = ddOpen.st.el; ddClose(); el.focus({ preventScroll: true }); return; }
+  if (k === 'ArrowDown' || k === 'ArrowUp') { e.preventDefault(); ddAct(ddOpen.act + (k === 'ArrowDown' ? 1 : -1), true); return; }
+  if (k === 'Home' || k === 'End' || k === 'PageUp' || k === 'PageDown') { e.preventDefault(); ddAct(k === 'Home' ? 0 : k === 'End' ? n - 1 : ddOpen.act + (k === 'PageDown' ? 6 : -6), true); return; }
+  if (k === 'Enter' || k === ' ') { e.preventDefault(); ddPick(ddOpen.act); return; }
+  if (k.length === 1 && /\S/.test(k)) {
+    const its = ddOpen.st.items, q = k.toLowerCase();
+    for (let j = 1; j <= n; j++) { const x = (ddOpen.act + j) % n; if (String(its[x].t).toLowerCase().startsWith(q)) { ddAct(x, true); break; } }
+  }
+}, true);
+addEventListener('resize', () => ddClose(true));
+addEventListener('blur', () => ddClose(true));
+
 /* ---------------- window, navigation */
 document.querySelectorAll('.wb').forEach(b => b.onclick = () => invoke('win_ctl', { a: b.dataset.w }).catch(() => {}));
 const PV_PAGES = ['caps', 'text'];
@@ -96,7 +183,7 @@ function go(id) {
   document.querySelectorAll('.ni').forEach(b => b.classList.toggle('on', b.dataset.p === id));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('on', p.id === 'p-' + id));
   $('#pvw').classList.toggle('on', PV_PAGES.includes(id));
-  $('#scroll').scrollTop = 0;
+  $('#scroll').scrollTop = 0; ddClose(true);
   if (cap) { cap.toIdle(); requestAnimationFrame(() => cap.measure()); }
   if (SHOW[id]) SHOW[id]();
   if (id !== 'ctl') micTest(false);
@@ -175,6 +262,7 @@ function buildCaps() {
     ['mini', 'Мини-волна', I('<rect x="4" y="3.5" width="16" height="9" rx="4.5"/><path d="M9.5 7v2M12 5.8v4.4M14.5 7v2"/>')],
     ['hidden', 'Скрыта', I('<path d="M7 8h10" stroke-width="3" stroke-dasharray="1.2 3" opacity=".55"/>')]
   ], 4, { sm: 'Скрыта — появится, если навести мышку', tip: 'idle' });
+  rng('idleSc', 'Размер в покое', 50, 200, 10, v => v + '%', { sm: 'Насколько крупная линия, точка или мини-волна, пока молчишь', dis: () => S_().idle === 'hidden', onin: () => { if (cap.state !== 'idle') cap.toIdle(); } });
   sw('breathe', 'Дыхание', 'Медленно сужается и расширяется', { dis: () => S_().idle === 'hidden' });
   rng('idleOp', 'Яркость в покое', 20, 100, 5, v => v + '%', { dis: () => S_().idle === 'hidden' });
   sw('hint', 'Подсказка при наведении', 'Показывает горячую клавишу');
@@ -223,11 +311,10 @@ function buildText() {
   sec('Распознавание');
   {
     const r = row('', 'Язык речи', 'На каком языке ты говоришь');
-    const s = h('select', 'in'); s.style.width = '190px';
-    [['ru', 'Русский'], ['auto', 'Определять самому'], ['en', 'English'], ['uk', 'Українська'], ['de', 'Deutsch'], ['es', 'Español'], ['kk', 'Қазақша']].forEach(([v, n]) => { const o = h('option', '', n); o.value = v; s.append(o); });
-    s.onchange = () => set('lang', s.value);
-    r.append(s); P.append(r);
-    UI.push(() => { s.value = S_().lang; });
+    const s = dd({ width: '200px', onchange: v => set('lang', v) });
+    s.setItems([['ru', 'Русский'], ['auto', 'Определять самому', 'Groq поймёт язык сам'], ['en', 'English'], ['uk', 'Українська'], ['de', 'Deutsch'], ['es', 'Español'], ['kk', 'Қазақша']].map(([v, t, sub]) => ({ v, t, sub })));
+    r.append(s.el); P.append(r);
+    UI.push(() => { s.set(S_().lang); });
   }
   {
     const r = h('div', 'row col'); r.append(lbl('Словарь', 'Имена, тикеры, термины — через запятую. Groq будет писать их правильно', 'dict'));
@@ -299,18 +386,21 @@ async function micTest(on) {
     listMics();
   } catch (e) { toast('Микрофон не включился: ' + (e.name === 'NotAllowedError' ? 'нет доступа' : e.name === 'NotFoundError' ? 'не найден' : e.message)); }
 }
+let micDD = null;
 async function listMics() {
-  const s = $('#micSel'); if (!s) return;
+  const s = micDD; if (!s) return;
   let ds = [];
   try { ds = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput'); } catch (e) {}
   if (ds.length && !ds.some(d => d.label)) {
     try { const st = await navigator.mediaDevices.getUserMedia({ audio: true }); st.getTracks().forEach(t => t.stop()); ds = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput'); } catch (e) {}
   }
   const curv = S_().mic;
-  s.innerHTML = '';
-  const def = h('option', '', 'Как в Windows'); def.value = ''; s.append(def);
-  ds.filter(d => d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications').forEach((d, i) => { const o = h('option', '', esc(d.label || 'Микрофон ' + (i + 1))); o.value = d.deviceId; s.append(o); });
-  s.value = [...s.options].some(o => o.value === curv) ? curv : '';
+  // the Windows default shows which device it is right now («По умолчанию - Микрофон (Realtek…)»)
+  const dl = (ds.find(d => d.deviceId === 'default') || {}).label || '';
+  const dn = dl.replace(/^[^-–—]*[-–—]\s*/, '').trim();
+  const items = [{ v: '', t: 'Как в Windows', sub: dn ? 'Сейчас: ' + dn : 'Тот, что выбран в Windows' }];
+  ds.filter(d => d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications').forEach((d, i) => items.push({ v: d.deviceId, t: d.label || 'Микрофон ' + (i + 1) }));
+  s.setItems(items, items.some(i => i.v === curv) ? curv : '');
 }
 function buildCtl() {
   page('ctl'); head('Управление', 'клавиша, место, микрофон');
@@ -330,10 +420,11 @@ function buildCtl() {
   {
     const r = row('', 'Микрофон', 'Чем слушать');
     const box = h('div', 'fld'); box.style.width = '330px';
-    const s = h('select', 'in'); s.id = 'micSel'; s.onchange = () => { set('mic', s.value); if (mic) { micTest(false); micTest(true); } };
+    micDD = dd({ onchange: v => { set('mic', v); if (mic) { micTest(false); micTest(true); } } });
+    micDD.el.style.flex = '1'; micDD.setItems([{ v: '', t: 'Как в Windows', sub: 'Тот, что выбран в Windows' }], '');
     const m = h('div', 'meter', '<b></b>'); m.id = 'micMeter'; m.style.width = '60px';
     const b = h('button', 'btn', 'Проверить'); b.id = 'micBtn'; b.onclick = () => micTest(!mic);
-    box.append(s, m, b); r.append(box); P.append(r);
+    box.append(micDD.el, m, b); r.append(box); P.append(r);
   }
   sec('Windows');
   {
@@ -454,24 +545,55 @@ function buildKey() {
 
 /* ---------------- page: about */
 const LATEST = 'https://retocker-voice.web.app/absolute/latest.json';
-let info = { version: '', logs: '' }, upd = null;
+let info = { version: '', logs: '' }, upd = null, updRun = false;
 const newer = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; };
+const updSt = (cls, t) => { const st = $('#updSt'); if (st) { st.className = 'status ' + cls; st.lastChild.textContent = t; } };
+// the app asks the signed manifest itself (no browser rules in the way); a plain fetch only in the browser preview
 async function checkUpdate(manual) {
-  const st = $('#updSt');
-  if (manual && st) { st.className = 'status wait'; st.lastChild.textContent = 'Проверяю…'; }
+  if (updRun) return;
+  if (manual) updSt('wait', 'Проверяю…');
   try {
-    const r = await fetch(LATEST + '?t=' + Date.now(), { cache: 'no-store' });
-    const j = await r.json();
+    let j;
+    if (RA.tauri) j = await invoke('upd_check');
+    else { const r = await fetch(LATEST + '?t=' + Date.now(), { cache: 'no-store' }); j = await r.json(); }
     if (!info.version) info = await invoke('app_info').catch(() => info);
     upd = j && j.version && info.version && newer(j.version, info.version) ? j : null;
     $('#updDot').hidden = !upd;
-    if (st) {
-      if (upd) { st.className = 'status ok'; st.lastChild.textContent = 'Есть новая версия ' + upd.version; }
-      else { st.className = 'status ok'; st.lastChild.textContent = 'У тебя последняя версия'; }
-    }
-    const b = $('#updBtn'); if (b) b.hidden = !upd;
+    if (upd) updSt('ok', 'Есть новая версия ' + upd.version + (upd.size ? ' · ' + upd.size : ''));
+    else updSt('ok', 'У тебя последняя версия');
+    const b = $('#updBtn'); if (b) { b.hidden = !upd; b.textContent = upd && upd.can ? 'Обновить до ' + upd.version : 'Скачать новую версию'; }
+    const nt = $('#updNotes'); if (nt) { nt.hidden = !(upd && upd.notes); if (upd) nt.textContent = upd.notes || ''; }
     refreshHome();
-  } catch (e) { if (st) { st.className = manual ? 'status bad' : 'status'; st.lastChild.textContent = manual ? 'Не получилось проверить — нет связи' : 'Проверю позже'; } }
+  } catch (e) { if (manual) updSt('bad', 'Не получилось проверить — нет связи'); else updSt('', 'Проверю позже'); }
+}
+// «Обновить»: the app downloads the new version, checks its signature, puts it in place and restarts
+function startUpdate() {
+  if (!upd || updRun) return;
+  if (!upd.can || !RA.tauri) { openUrl(upd.url); return; }
+  updRun = true;
+  $('#updBtn').hidden = true; $('#updChk').disabled = true; $('#updMan').hidden = true;
+  $('#updBar').hidden = false; $('#updBar').firstChild.style.width = '0%';
+  updSt('wait', 'Скачиваю…');
+  invoke('upd_install').catch(e => updEv({ stage: 'error', msg: String(e) }));
+}
+const mb = n => (n / 1048576).toFixed(1).replace('.', ',');
+function updEv(e) {
+  const bar = $('#updBar');
+  if (e.stage === 'down') {
+    const p = Math.max(0, Math.min(1, e.p || 0));
+    if (bar) bar.firstChild.style.width = (p * 100).toFixed(1) + '%';
+    updSt('wait', 'Скачиваю… ' + Math.round(p * 100) + '%' + (e.total ? ` · ${mb(e.got || 0)} из ${mb(e.total)} МБ` : ''));
+  } else if (e.stage === 'check') { if (bar) bar.firstChild.style.width = '100%'; updSt('wait', 'Проверяю подпись…'); }
+  else if (e.stage === 'apply') updSt('wait', 'Устанавливаю… Windows может спросить разрешение');
+  else if (e.stage === 'restart') updSt('ok', 'Перезапускаю…');
+  else if (e.stage === 'error') {
+    updRun = false;
+    if (bar) bar.hidden = true;
+    $('#updChk').disabled = false;
+    const b = $('#updBtn'); if (b) b.hidden = !upd;
+    $('#updMan').hidden = !upd;
+    updSt('bad', 'Не получилось обновить: ' + (e.msg || 'ошибка'));
+  }
 }
 function buildAbout() {
   page('about'); head('О программе');
@@ -480,10 +602,15 @@ function buildAbout() {
     <div style="flex:1"><div style="font-size:16px;font-weight:750">Retocker Voice</div><div style="color:var(--tx2);font-size:12.5px">Говоришь — текст появляется там, где курсор. <span id="ver"></span></div></div></div>`;
   P.append(c);
   sec('Обновления');
-  { const r = h('div', 'row'); r.append(h('div', 'status', '<i></i><span id="updTx">Проверю при запуске</span>')); r.firstChild.id = 'updSt';
-    const bx = h('div', 'btns'); const b1 = h('button', 'btn', 'Проверить'); b1.onclick = () => checkUpdate(true);
-    const b2 = h('button', 'btn pri', 'Скачать новую версию'); b2.id = 'updBtn'; b2.hidden = true; b2.onclick = () => upd && openUrl(upd.url);
-    bx.append(b2, b1); r.append(bx); P.append(r); }
+  { const r = h('div', 'row col upd'), top = h('div', 'rt');
+    const st = h('div', 'status', '<i></i><span id="updTx">Проверю при запуске</span>'); st.id = 'updSt';
+    const bx = h('div', 'btns'); const b1 = h('button', 'btn', 'Проверить'); b1.id = 'updChk'; b1.onclick = () => checkUpdate(true);
+    const b3 = h('button', 'btn', 'Скачать вручную'); b3.id = 'updMan'; b3.hidden = true; b3.title = 'Открыть страницу загрузки в браузере'; b3.onclick = () => upd && openUrl(upd.url);
+    const b2 = h('button', 'btn pri', 'Обновить'); b2.id = 'updBtn'; b2.hidden = true; b2.onclick = startUpdate;
+    bx.append(b2, b3, b1); top.append(st, bx);
+    const nt = h('div', 'unotes'); nt.id = 'updNotes'; nt.hidden = true;
+    const bar = h('div', 'pbar', '<b></b>'); bar.id = 'updBar'; bar.hidden = true;
+    r.append(top, nt, bar); P.append(r); }
   sec('Как это работает');
   P.append(h('div', 'note', '<div>Программа живёт в <b>трее</b> (у часов). Крестик закрывает только это окно — капсула продолжает работать. Совсем выйти — правой кнопкой по значку в трее → <b>Выйти</b>.</div>'));
   sec('Если что-то не так');
@@ -519,7 +646,7 @@ function refreshHome() {
     <div class="hero"><div class="grow"><h2>${hold ? 'Зажми' : 'Нажми'} ${keys} и говори</h2><p>${hold ? 'Отпусти — и текст появится там, где стоит курсор.' : 'Нажми ещё раз — и текст появится там, где стоит курсор.'} Можно и мышкой: нажми на капсулу внизу экрана.</p></div></div>`;
   if (!a.vk) html += `<div class="note warn" style="margin:8px 0 0"><div><b>Нужен ключ Groq</b> — без него текст не распознаётся. Бесплатно, 2 минуты.</div><button class="btn pri" data-go="key">Ввести ключ</button></div>`;
   else if (!a.ok) html += `<div class="note warn" style="margin:8px 0 0"><div><b>Ключ не проверен.</b> Открой «Ключ Groq» и нажми «Проверить».</div><button class="btn" data-go="key">Открыть</button></div>`;
-  if (upd) html += `<div class="note" style="margin:8px 0 0"><div><b>Вышла версия ${esc(upd.version)}.</b> ${esc(upd.notes || '')}</div><button class="btn pri" data-upd>Скачать</button></div>`;
+  if (upd) html += `<div class="note" style="margin:8px 0 0"><div><b>Вышла версия ${esc(upd.version)}.</b> ${esc(upd.notes || '')}</div><button class="btn pri" data-upd>${upd.can && RA.tauri ? 'Обновить' : 'Скачать'}</button></div>`;
   html += `<div class="cards">
     <div class="sc"><small>Сегодня</small><b>${fmtN(today)}</b><span>${pl(today, 'слово', 'слова', 'слов')}</span></div>
     <div class="sc"><small>За неделю</small><b>${fmtN(week)}</b><span>${pl(week, 'слово', 'слова', 'слов')}</span></div>
@@ -538,7 +665,7 @@ function refreshHome() {
     : `<div class="empty">Здесь появятся программы, в которые ты диктуешь</div>`) + '</div>';
   el.innerHTML = html;
   el.querySelectorAll('[data-go]').forEach(b => b.onclick = () => go(b.dataset.go));
-  el.querySelectorAll('[data-upd]').forEach(b => b.onclick = () => upd && openUrl(upd.url));
+  el.querySelectorAll('[data-upd]').forEach(b => b.onclick = () => { if (!upd) return; if (upd.can && RA.tauri) { go('about'); startUpdate(); } else openUrl(upd.url); });
 }
 
 /* ---------------- start */
@@ -549,13 +676,17 @@ function init() {
   listen('page', e => go(String(e.payload || 'home')));
   listen('rec', e => hkEvent(e.payload));
   listen('stats', () => { if (cur === 'home') refreshHome(); });
+  listen('upd', e => updEv(e.payload || {}));
   addEventListener('storage', e => {
     if (e.key === RA.KEY) { cap.reload(); refresh(); if (cur === 'home') refreshHome(); }
     if (e.key === RA.STATS && cur === 'home') refreshHome();
     if (e.key === RA.AUTH) keyState();
   });
   addEventListener('blur', () => { if (hkRec) hkStop(); });
-  invoke('app_info').then(a => { info = a; $('#nfoot').innerHTML = `Версия <b>${esc(a.version)}</b>`; }).catch(() => { $('#nfoot').innerHTML = 'Предпросмотр'; });
+  invoke('app_info').then(a => {
+    info = a; $('#nfoot').innerHTML = `Версия <b>${esc(a.version)}</b>`;
+    if (a.updated) setTimeout(() => toast('Обновлено до ' + a.updated, 4200), 500);
+  }).catch(() => { $('#nfoot').innerHTML = 'Предпросмотр'; });
   go((location.hash || '').slice(1) || (RA.auth().vk ? 'home' : 'key'));
   setTimeout(() => checkUpdate(false), 1500);
   setInterval(() => checkUpdate(false), 6 * 3600 * 1000);
