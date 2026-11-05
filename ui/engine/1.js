@@ -214,9 +214,10 @@ function target() {
   const g = groupFor();
   if (state === 'idle') {
     if (g === 'hint') return { w: Math.round(GR.hint.inner.offsetWidth), h: 30, g };
-    if (S.idle === 'dot') return { w: 10, h: 10, g };
-    if (S.idle === 'mini') return { w: 38, h: 18, g };
-    return { w: 42, h: 6, g };
+    const k = (S.idleSc || 100) / 100;
+    if (S.idle === 'dot') return { w: Math.round(10 * k), h: Math.round(10 * k), g };
+    if (S.idle === 'mini') return { w: Math.round(38 * k), h: Math.round(18 * k), g };
+    return { w: Math.round(42 * k), h: Math.max(2, Math.round(6 * k)), g };
   }
   if (state === 'rec') { recLay = measureRec(); return { w: recLay.w, h: 36, g }; }
   return { w: Math.round(GR[g].inner.offsetWidth), h: 36, g };
@@ -258,7 +259,13 @@ function retarget(o = {}) {
     curG = z.g; TK.jump(1);
   } else {
     if (!same || G.w.isAnimating() || G.h.isAnimating()) morph(z);
-    if (z.g !== prevG) { if (prevG) exitG(GR[prevG]); if (z.g) enterG(GR[z.g]); curG = z.g; if (z.g === 'done') { TK.jump(0); animate(TK, 1, TW(.34, .12, [.3, 0, .2, 1])); } }
+    if (z.g !== prevG) {
+      // back to rest: the content shrinks with the shape and fades out by the end — the opening played backwards
+      const sync = state === 'idle' && z.g !== 'hint' && prevG && prevG !== 'hint' && prevG !== 'mini';
+      if (prevG) exitG(GR[prevG], sync);
+      if (z.g) enterG(GR[z.g], sync ? sty().vd * .75 : 0);
+      curG = z.g; if (z.g === 'done') { TK.jump(0); animate(TK, 1, TW(.34, .12, [.3, 0, .2, 1])); }
+    }
   }
   setOp(o.instant);
   breath();
@@ -276,15 +283,21 @@ function morph(z) {
     }
   } else { animate(G.w, z.w, SPR(st.vd, st.b)); animate(G.h, z.h, SPR(st.vd, st.b)); }
 }
-function enterG(g) {
-  const st = sty(), d = S.anim === 'drop' ? .06 : .03;
+function enterG(g, late = 0) {
+  const st = sty(), d = (S.anim === 'drop' ? .06 : .03) + late;
   if (g.op.get() < .05) { g.sc.jump(st.inS); g.bl.jump(st.blur); }
   animate(g.op, 1, TW(.22, d, [.3, 0, .2, 1]));
   animate(g.sc, 1, SPRu(st.vd * .92, Math.min(.42, st.b + .06), d * .5));
   if (g.bl.get() > 0) animate(g.bl, 0, TW(.3, d, [.2, .7, .2, 1]));
 }
-function exitG(g) {
+function exitG(g, sync) {
   const st = sty();
+  if (sync) {
+    animate(g.op, 0, TW(st.vd * .9, 0, [.6, 0, .85, .3]));
+    animate(g.sc, st.outS, TW(st.vd, 0, [.4, 0, .6, 1]));
+    if (st.blur) animate(g.bl, 4, TW(st.vd * .9, 0, [.6, 0, .85, .3]));
+    return;
+  }
   animate(g.op, 0, TW(.11, 0, [.4, 0, 1, 1]));
   animate(g.sc, st.outS, TW(.16, 0, [.4, 0, 1, 1]));
   if (st.blur) animate(g.bl, 4, TW(.14));
@@ -343,7 +356,8 @@ function drawG(g, w, h) {
     const room = Math.min((w - 6) / Math.max(1, (g.tw || w) - 24), (h - 4) / 17);
     fit = Math.min(1, room);
     const t = clamp((room - .86) / .14, 0, 1); o *= t * t * (3 - 2 * t);
-  } else fit = Math.min(1, w / (g.tw || w || 1), h / (g.th || h || 1));
+  } else if (g.key === 'mini') fit = Math.min((S.idleSc || 100) / 100, w / 38, h / 18); // grows with «Размер в покое»
+  else fit = Math.min(1, w / (g.tw || w || 1), h / (g.th || h || 1));
   const on = o > .003;
   if (on !== g.on) { g.on = on; g.el.classList.toggle('on', on); }
   if (!on) return;
@@ -467,20 +481,3 @@ function closePanel(instant) {
     animate(P.op, 0, TW(.18)).then(() => { if (my === pTok) hidePanel(); });
     return;
   }
-  const c = capFinal();
-  const sp = SPR(Math.min(.42, st.pvd * .85), Math.min(.12, st.pb * .5));
-  pT = null;
-  animate(P.x, c.x + 3, sp); animate(P.y, c.y + 3, sp); animate(P.w, Math.max(0, c.w - 6), sp); animate(P.h, Math.max(0, c.h - 6), sp); animate(P.r, Math.max(0, c.r - 3), sp);
-  animate(P.op, 0, TW(.12, Math.min(.42, st.pvd * .85) * .62)).then(() => { if (my === pTok && !panelOpen) hidePanel(); });
-}
-let upQ = false, upJump = false;
-function updatePanel(o = {}) {
-  if (!panelOpen) return;
-  setMode();
-  if (o.jump) upJump = true;
-  if (upQ) return; upQ = true;
-  frame.read(() => { upQ = false; if (!panelOpen) return; const t = panelTarget(); toPanel(t, upJump ? 'jump' : 'resize'); upJump = false; req(); });
-}
-function togglePanel() { panelOpen ? closePanel() : openPanel(); }
-function updCount() { const n = wc(words.filter(w => !w.dead).map(w => w.t).join(' ')); lCnt.textContent = n ? words_(n) : ''; }
-
