@@ -206,7 +206,7 @@ function buildText() {
   page('text'); head('Текст', 'живой текст, причёска, вставка');
   sec('Живой текст');
   seg('live', 'Показывать текст во время речи', [['off', 'Нет'], ['tap', 'По клику'], ['always', 'Всегда']], 'По клику — нажми на точку в капсуле', { pv: 'live', tip: 'live' });
-  sw('pdot', 'Панель из точки', 'Точка сама вырастает в панель и сжимается обратно', { pv: 'dot', tip: 'pdot', badge: 'NEW', dis: () => S_().live === 'off' });
+  sw('pdot', 'Точка растёт', 'Пока текст открыт, точка становится больше — вместо колечка', { pv: 'dot', tip: 'pdot', dis: () => S_().live === 'off' });
   seg('reveal', 'Как появляются слова', [['letters', 'Буквы'], ['words', 'Слова'], ['fade', 'Плавно']], '', { pv: 'live', dis: () => S_().live === 'off' });
   rng('fs', 'Размер текста', 12, 18, 1, v => v + ' px', { pv: 'live', dis: () => S_().live === 'off' && !S_().review });
   rng('pw', 'Ширина панели', 300, 560, 10, v => v + ' px', { pv: 'live', dis: () => S_().live === 'off' && !S_().review });
@@ -477,7 +477,7 @@ function buildAbout() {
   page('about'); head('О программе');
   const c = h('div', 'card');
   c.innerHTML = `<div style="display:flex;align-items:center;gap:14px"><svg viewBox="0 0 64 64" style="width:44px;height:44px"><rect width="64" height="64" rx="15" fill="#2a2a2a" stroke="none"/><rect x="9" y="22" width="46" height="20" rx="10" fill="#fff" stroke="none"/><circle cx="20" cy="32" r="3.6" fill="#1c1c1c" stroke="none"/><path d="M29 29v6M35 26v12M41 28.5v7M47 30.5v3" stroke="#1c1c1c" stroke-width="3" stroke-linecap="round"/></svg>
-    <div style="flex:1"><div style="font-size:16px;font-weight:750">Retocker Absolute</div><div style="color:var(--tx2);font-size:12.5px">Говоришь — текст появляется там, где курсор. <span id="ver"></span></div></div></div>`;
+    <div style="flex:1"><div style="font-size:16px;font-weight:750">Retocker Voice</div><div style="color:var(--tx2);font-size:12.5px">Говоришь — текст появляется там, где курсор. <span id="ver"></span></div></div></div>`;
   P.append(c);
   sec('Обновления');
   { const r = h('div', 'row'); r.append(h('div', 'status', '<i></i><span id="updTx">Проверю при запуске</span>')); r.firstChild.id = 'updSt';

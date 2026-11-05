@@ -1,4 +1,4 @@
-// Retocker Absolute: dictation for Windows. Speak — the text appears where the cursor is.
+// Retocker Voice: dictation for Windows. Speak — the text appears where the cursor is.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod hook;
@@ -269,10 +269,11 @@ fn main() {
         logx::init(d.join("logs"));
       }
       logx::log(&format!("start v{} autostart={autostarted}", app.package_info().version));
+      win::autostart_migrate();
 
       // the capsule: a transparent layer over the whole work area that lets clicks through except on the capsule
       let cap = WebviewWindowBuilder::new(app, "capsule", WebviewUrl::App("capsule.html".into()))
-        .title("Retocker Absolute — капсула")
+        .title("Retocker Voice — капсула")
         .inner_size(600.0, 400.0)
         .position(0.0, 0.0)
         .transparent(true)
@@ -298,7 +299,7 @@ fn main() {
 
       // settings
       let main = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("settings.html".into()))
-        .title("Retocker Absolute")
+        .title("Retocker Voice")
         .inner_size(1000.0, 680.0)
         .min_inner_size(880.0, 560.0)
         .center()
@@ -320,13 +321,13 @@ fn main() {
       }
 
       // tray
-      let open = MenuItem::with_id(app, "open", "Открыть Retocker Absolute", true, None::<&str>)?;
+      let open = MenuItem::with_id(app, "open", "Открыть Retocker Voice", true, None::<&str>)?;
       let stats = MenuItem::with_id(app, "stats", "Статистика", true, None::<&str>)?;
       let sep = PredefinedMenuItem::separator(app)?;
       let quit_i = MenuItem::with_id(app, "quit", "Выйти", true, None::<&str>)?;
       let menu = Menu::with_items(app, &[&open, &stats, &sep, &quit_i])?;
       let mut tb = TrayIconBuilder::with_id("tray")
-        .tooltip("Retocker Absolute")
+        .tooltip("Retocker Voice")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, e| match e.id.as_ref() {
@@ -369,5 +370,5 @@ fn main() {
       Ok(())
     })
     .run(tauri::generate_context!())
-    .expect("Retocker Absolute could not start");
+    .expect("Retocker Voice could not start");
 }
