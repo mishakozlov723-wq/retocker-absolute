@@ -187,6 +187,7 @@ function go(id) {
   if (cap) { cap.toIdle(); requestAnimationFrame(() => cap.measure()); }
   if (SHOW[id]) SHOW[id]();
   if (id !== 'ctl') micTest(false);
+  if (id !== 'text') asrTryRun(false);
 }
 const SHOW = {};
 document.querySelectorAll('.ni').forEach(b => b.onclick = () => go(b.dataset.p));
@@ -289,13 +290,110 @@ function buildCaps() {
   sw('sounds', 'Звуки', 'Тихий «дзынь» в начале и в конце');
 }
 
+/* ---------------- «Мгновенный живой текст»: the speech model on this computer (downloaded here, once) */
+const capLight = () => { const S = S_(); if (S.bg === 'glass') return false; return RA.lum(S.bg === 'custom' ? S.bgc : (RA.BGS.find(b => b[0] === S.bg) || RA.BGS[0])[1] || '#1e1e1e') > .4; };
+let asrSt = { installed: false }, asrTry = null, asrTryN = 0, asrPaint = () => {};
+const asrStatus = () => RA.tauri ? invoke('asr_status').then(s => { asrSt = s || {}; asrPaint(); }).catch(() => {}) : Promise.resolve();
+function asrOut(t, last) {
+  const el = $('#asrOut'); if (!el) return;
+  const w = String(t || '').trim().split(/\s+/).filter(Boolean);
+  if (!w.length) { el.innerHTML = '<span class="ph">' + (asrTry ? 'Говори — слова появятся здесь…' : 'Ничего не услышал — попробуй ещё раз, погромче') + '</span>'; return; }
+  const n = last ? w.length : Math.max(0, w.length - 2);
+  el.innerHTML = esc(w.slice(0, n).join(' ')) + (n < w.length ? ' <span class="tent">' + esc(w.slice(n).join(' ')) + '</span>' : '');
+}
+async function asrTryRun(on) {
+  const b = $('#asrTry');
+  if (!on) {
+    if (!asrTry) return;
+    const t = asrTry; asrTry = null; clearTimeout(t.to);
+    try { t.node.disconnect(); } catch (e) {}
+    t.stream.getTracks().forEach(x => x.stop()); try { t.ctx.close(); } catch (e) {}
+    if (b) b.textContent = 'Попробовать на своём голосе';
+    const txt = await invoke('asr_finish', { id: t.id }).catch(() => '');
+    if (asrTryN === t.n) asrOut(txt || t.txt, true);
+    return;
+  }
+  if (asrTry) return;
+  try {
+    const dev = S_().mic;
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: dev ? { deviceId: { exact: dev } } : true }); }
+    catch (e) { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    const ctx = new AudioContext(), n = ++asrTryN, id = 0x7f000000 + n;
+    const t = asrTry = { stream, ctx, id, n, txt: '', node: null };
+    $('#asrOut').hidden = false; asrOut('');
+    if (b) b.textContent = 'Хватит';
+    if (!(await invoke('asr_start', { id }).catch(() => false))) { toast('Модель не найдена — скачай её ещё раз'); asrTryRun(false); asrStatus(); return; }
+    t.node = await RA.pcmTap(ctx, ctx.createMediaStreamSource(stream), pcm => { if (asrTry === t) RA.asrFeed(id, pcm); });
+    t.to = setTimeout(() => { if (asrTry === t) asrTryRun(false); }, 30000);
+  } catch (e) { asrTry = null; if (b) b.textContent = 'Попробовать на своём голосе'; toast('Микрофон не включился: ' + (e.name === 'NotAllowedError' ? 'нет доступа' : e.name === 'NotFoundError' ? 'не найден' : e.message)); }
+}
+function buildFast() {
+  const r = h('div', 'row col fast'), top = h('div', 'rt');
+  const tg = h('input', 'sw'); tg.type = 'checkbox'; tg.title = 'Включить или выключить';
+  tg.onchange = () => { set('fast', tg.checked); if (tg.checked) cap.preview('fix'); };
+  top.append(lbl('Мгновенный живой текст', 'Слова появляются сразу, пока говоришь. Их слышит сам компьютер, без интернета — а итоговый текст всё равно пишет Groq', '', 'новое'), tg);
+  const mid = h('div', 'rt mid'), st = h('div', 'status', '<i></i><span></span>'), bx = h('div', 'btns');
+  const bGet = h('button', 'btn pri', 'Скачать · ≈50 МБ'), bCan = h('button', 'btn', 'Отмена'), bTry = h('button', 'btn', 'Попробовать на своём голосе'), bDel = h('button', 'btn', 'Удалить');
+  bTry.id = 'asrTry';
+  bGet.onclick = () => { asrSt = { ...asrSt, busy: true, err: null, got: 0, total: asrSt.need || 0 }; asrPaint(); invoke('asr_get').catch(e => { asrSt.busy = false; asrSt.err = String(e); asrPaint(); }); };
+  bCan.onclick = () => invoke('asr_cancel').catch(() => {});
+  bTry.onclick = () => asrTryRun(!asrTry);
+  bDel.onclick = async () => {
+    if (!bDel._arm) { bDel._arm = true; bDel.textContent = 'Точно удалить?'; setTimeout(() => { bDel._arm = false; asrPaint(); }, 3000); return; }
+    bDel._arm = false; await asrTryRun(false);
+    try { await invoke('asr_del'); toast('Модель удалена'); } catch (e) { toast('Не получилось удалить: ' + e); }
+    push(); asrStatus();
+  };
+  bx.append(bGet, bCan, bTry, bDel); mid.append(st, bx);
+  const bar = h('div', 'pbar', '<b></b>');
+  const out = h('div', 'asrout'); out.id = 'asrOut'; out.hidden = true;
+  r.append(top, mid, bar, out); P.append(r);
+  const stx = (cls, t) => { st.className = 'status' + (cls ? ' ' + cls : ''); st.lastChild.textContent = t; };
+  asrPaint = () => {
+    const s = asrSt, inst = !!s.installed, busy = !!s.busy;
+    tg.hidden = !inst; bGet.hidden = inst || busy; bCan.hidden = !busy; bTry.hidden = bDel.hidden = !inst || busy; bar.hidden = !busy;
+    if (!inst) { out.hidden = true; }
+    if (!bDel._arm) bDel.textContent = 'Удалить модель' + (s.size ? ' · ' + mb(s.size) + ' МБ' : '');
+    bGet.textContent = s.err ? 'Попробовать ещё раз' : 'Скачать · ≈50 МБ';
+    if (!RA.tauri) stx('', 'Работает только в самой программе');
+    else if (busy) { const p = s.total ? Math.min(1, (s.got || 0) / s.total) : 0; bar.firstChild.style.width = (p * 100).toFixed(1) + '%'; stx('wait', 'Скачиваю… ' + Math.round(p * 100) + '%' + (s.total ? ` · ${mb(s.got || 0)} из ${mb(s.total)} МБ` : '')); }
+    else if (s.err) stx('bad', 'Не получилось скачать: ' + s.err);
+    else if (inst && s.loadErr) stx('bad', 'Модель не запускается: ' + s.loadErr);
+    else if (inst) stx(S_().fast ? 'ok' : '', S_().fast ? (S_().live === 'off' ? 'Включено — но живой текст выключен выше' : 'Включено · модель на компьютере') : 'Выключено · модель на компьютере');
+    else stx('', 'Нужно один раз скачать модель распознавания');
+  };
+  UI.push(() => { tg.checked = !!S_().fast; asrPaint(); });
+  listen('asr_dl', e => {
+    const p = e.payload || {};
+    if (p.state === 'run') { asrSt = { ...asrSt, busy: true, err: null, got: p.got, total: p.total }; asrPaint(); }
+    else { if (p.state === 'err') asrSt.err = p.err || 'ошибка'; else if (p.state === 'cancel') toast('Загрузка отменена'); else if (p.state === 'done') toast('Готово — теперь слова появляются сразу'); asrStatus().then(() => { if (p.state === 'err') { asrSt.err = asrSt.err || p.err || 'ошибка'; asrPaint(); } }); }
+  });
+  listen('asr', e => { const p = e.payload || {}; if (asrTry && p.id === asrTry.id) { asrTry.txt = p.text || ''; asrOut(asrTry.txt); } });
+  asrStatus();
+}
+function buildFixc() {
+  const r = h('div', 'row col'), top = h('div', 'rt'), nm = h('span', 'swn'); top.append(lbl('Цвет исправлений', 'Когда Groq поправит слово, оно на миг подсветится этим цветом'), nm);
+  const g = h('div', 'sws');
+  RA.FIXC.forEach(([v, , , n]) => { const b = h('button', 'swc' + (v === 'off' ? ' off' : '')); b.title = n; b._v = v; b.onclick = () => set('fixc', v, 'fix'); g.append(b); });
+  r.append(top, g); P.append(r);
+  UI.push(() => {
+    const S = S_(), L = capLight(), c = RA.FIXC.find(x => x[0] === S.fixc) || RA.FIXC[0];
+    [...g.children].forEach(b => { const x = RA.FIXC.find(y => y[0] === b._v); b.classList.toggle('on', b._v === c[0]); if (x[0] === 'acc') b.style.background = S.acc; else if (x[1]) b.style.background = L ? x[2] : x[1]; });
+    nm.textContent = c[3]; r.classList.toggle('dis', S.live === 'off');
+  });
+}
+
 /* ---------------- page: text */
 function buildText() {
   page('text'); head('Текст', 'живой текст, причёска, вставка');
+  SHOW.text = asrStatus;
   sec('Живой текст');
+  buildFast();
   seg('live', 'Показывать текст во время речи', [['off', 'Нет'], ['tap', 'По клику'], ['always', 'Всегда']], 'По клику — нажми на точку в капсуле', { pv: 'live', tip: 'live' });
   sw('pdot', 'Точка растёт', 'Пока текст открыт, точка становится больше — вместо колечка', { pv: 'dot', tip: 'pdot', dis: () => S_().live === 'off' });
   seg('reveal', 'Как появляются слова', [['letters', 'Буквы'], ['words', 'Слова'], ['fade', 'Плавно']], '', { pv: 'live', dis: () => S_().live === 'off' });
+  buildFixc();
   rng('fs', 'Размер текста', 12, 18, 1, v => v + ' px', { pv: 'live', dis: () => S_().live === 'off' && !S_().review });
   rng('pw', 'Ширина панели', 300, 560, 10, v => v + ' px', { pv: 'live', dis: () => S_().live === 'off' && !S_().review });
 
