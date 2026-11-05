@@ -113,5 +113,6 @@
 .lt .w.strike{opacity:.42}
 .lt .w.strike::after{transform:scaleX(1)}
 .lt .w.ghost{position:absolute;margin:0;pointer-events:none;transition:none}
+.lt .w.ph{opacity:.5;filter:blur(5px);user-select:none;pointer-events:none;transition:none}
 .lt .ch{animation:cIn calc(.3s / var(--k)) ease-out both}
 @keyframes cIn{from{opacity:0}}

@@ -101,6 +101,7 @@ function simLevel(ms, sim) {
 }
 
 /* ---------------- state */
+let phs = []; // blurred placeholders of the live text (see phAdd)
 let state = 'idle', hover = false, panelOpen = false, rec = null, words = [], lv = 0, flow = 0, idleT = 0, pv = false, pvT = [];
 let dragging = false, hidden = false, errAct = null, editing = false;
 let SW = 800, SH = 600, SX = 0, SY = 0;
@@ -468,8 +469,10 @@ function openPanel() {
   animate(PC.dy, 0, SPR(st.pvd * .95, Math.min(.3, st.pb + .05), .03));
   if (PC.bl.get() > 0) animate(PC.bl, 0, TW(.3, .05));
   req();
+  if (rec && rec.real && state === 'rec') partialLoop(rec, true); // the text was just opened while speaking: ask Groq at once
 }
 function closePanel(instant) {
+  if (phs.length) phDrop();
   if (!panelOpen && !pVis) return;
   panelOpen = false; cc.dataset.open = 0;
   const my = ++pTok;
