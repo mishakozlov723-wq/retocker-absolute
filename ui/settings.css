@@ -233,3 +233,34 @@ select.in option{background:#262626}
 .scn .w{display:inline-block;transition:opacity .3s,transform .3s}
 .scn .w.st{opacity:.4;text-decoration:line-through}
 .scn .w.gone{opacity:0;transform:scale(.9);width:0;margin:0;overflow:hidden}
+
+/* ---------- own dropdown (language, microphone): long names are cut with «…», the list shows them in full */
+.dd{height:32px;border-radius:7px;background:rgba(255,255,255,.045);border:1px solid var(--ln2);padding:0 8px 0 10px;display:flex;align-items:center;gap:8px;min-width:0;font-size:12.5px;font-weight:600;color:var(--tx);text-align:left;transition:border-color .12s,background .12s}
+.dd:hover{background:rgba(255,255,255,.065)}
+.dd:focus-visible{outline:none;border-color:rgba(255,255,255,.35)}
+.dd.on{border-color:rgba(255,255,255,.35);background:rgba(255,255,255,.06)}
+.dd .v{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dd svg{width:14px;height:14px;stroke:#aaa;stroke-width:1.6;transition:transform .18s cubic-bezier(.2,.8,.2,1)}
+.dd.on svg{transform:rotate(180deg)}
+.ddl{position:fixed;z-index:90;background:#262626;border:1px solid var(--ln2);border-radius:10px;box-shadow:0 14px 40px rgba(0,0,0,.5),0 2px 8px rgba(0,0,0,.3);padding:4px;overflow-y:auto;overscroll-behavior:contain;
+  opacity:0;transform:translateY(-4px) scale(.985);transform-origin:top center;transition:opacity .14s ease,transform .18s cubic-bezier(.2,.8,.2,1)}
+.ddl::-webkit-scrollbar{width:8px}
+.ddl::-webkit-scrollbar-thumb{border-width:2px}
+.ddl.up{transform:translateY(4px) scale(.985);transform-origin:bottom center}
+.ddl.on{opacity:1;transform:none}
+.ddi{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;cursor:pointer;color:var(--tx2);font-size:12.5px;font-weight:600}
+.ddi+.ddi{margin-top:1px}
+.ddi.act{background:var(--hv2);color:var(--tx)}
+.ddi.sel{color:var(--tx)}
+.ddi .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.ddi .t{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.35;overflow-wrap:anywhere}
+.ddi small{font-size:11px;line-height:1.35;color:var(--tx3);font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ddi svg{width:14px;height:14px;stroke-width:1.9;opacity:0}
+.ddi.sel svg{opacity:1}
+
+/* ---------- updates (About) */
+.row.upd .rt{flex-wrap:wrap;row-gap:8px}
+.row.upd .status{flex:1;min-width:0}
+.unotes{font-size:12px;color:var(--tx2);line-height:1.5;white-space:pre-line;padding:0 1px}
+.pbar{height:6px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden}
+.pbar b{display:block;height:100%;width:0;background:var(--ok);border-radius:3px;transition:width .12s linear}

@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Both windows of the app",
-  "windows": ["capsule", "main"],
+  "description": "The windows of the app and of its installer",
+  "windows": ["capsule", "main", "setup"],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
