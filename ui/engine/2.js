@@ -215,6 +215,9 @@ function endRec() {
 }
 function clearText() { lText.getAnimations({ subtree: true }).forEach(a => a.cancel()); lText.contentEditable = 'false'; lText.textContent = ''; words = []; updCount(); lBody.scrollTop = 0; }
 function startRec(o = {}) {
+  // nothing to recognise with (no Groq key yet): say so at once instead of after the speech
+  const why = OVERLAY && !o.preview && ENV.check ? ENV.check() : '';
+  if (why) { if (warm) micClose(warm); fail(why, 'key'); return null; }
   clearTimeout(idleT); flow++; endRec();
   closePanel(true);
   clearText(); setEditing(false);

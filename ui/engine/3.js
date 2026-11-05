@@ -9,10 +9,10 @@ function hk(t, other) {
     if (hold) {
       if (!canStart()) return;
       // Ctrl+Win and the like are also parts of other shortcuts: wait a moment to be sure (the mic is already on)
-      if (modOnly) { if (OVERLAY) micOpen(); clearTimeout(hkT); hkT = setTimeout(() => { hkT = 0; held = true; startRec(); }, 130); }
+      if (modOnly) { if (OVERLAY && !(ENV.check && ENV.check())) micOpen(); clearTimeout(hkT); hkT = setTimeout(() => { hkT = 0; held = true; startRec(); }, 130); }
       else { held = true; startRec(); }
     } else if (!modOnly) toggle();
-    else if (canStart() && OVERLAY) micOpen();
+    else if (canStart() && OVERLAY && !(ENV.check && ENV.check())) micOpen();
     return;
   }
   if (t === 'other') {

@@ -32,6 +32,7 @@
       RA.addStat(m.words, Math.round(m.sec || 0), appName(app));
       RA.emitTo('main', 'stats');
     },
+    check: () => (RA.auth().vk ? '' : 'Нет ключа Groq'),
     onChange: S => syncHotkey(S),
     onState: s => { if (s !== lastState) { lastState = s; log('state ' + s); } },
     recognize: (blob, o) => window.VOICE.recognize(blob, o),
