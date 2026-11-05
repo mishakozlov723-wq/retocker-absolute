@@ -1,4 +1,4 @@
-/* The installer and the uninstaller (ui/setup.html): a small 640×460 window without the system frame,
+/* The installer and the uninstaller (ui/setup.html): a small 640×490 window without the system frame,
    in the same style as the settings. The live capsule on top is the real engine in preview mode. */
 body.setup{background:var(--bg)}
 .win{display:flex;flex-direction:column;height:100vh}

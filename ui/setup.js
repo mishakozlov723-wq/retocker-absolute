@@ -82,7 +82,7 @@ function loop(on) {
 
 /* ---------------- screens */
 let cur = '', busy = false, info = null;
-const opts = { dir: '', autostart: true, desktop: true };
+const opts = { dir: '', autostart: true, desktop: true, asr: false };
 function show(id) {
   if (cur === id) return;
   cur = id; busy = id === 'prog';
@@ -107,7 +107,7 @@ async function paintDir() {
 }
 async function install() {
   if (busy) return;
-  opts.autostart = $('#wAuto').checked; opts.desktop = $('#wDesk').checked;
+  opts.autostart = $('#wAuto').checked; opts.desktop = $('#wDesk').checked; opts.asr = $('#wAsr').checked;
   $('#gTitle').textContent = 'Устанавливаю…'; prog({ p: 2, t: 'Готовлюсь…' }); show('prog');
   try {
     const exe = await call('setup_run', { opts: { ...opts } });
@@ -253,7 +253,7 @@ async function auto() {
   else {
     $('#wVer').textContent = info.version ? 'v' + info.version : '';
     Object.assign(opts, { dir: info.dir, autostart: !!info.autostart, desktop: !!info.desktop });
-    $('#wAuto').checked = opts.autostart; $('#wDesk').checked = opts.desktop;
+    $('#wAuto').checked = opts.autostart; $('#wDesk').checked = opts.desktop; $('#wAsr').checked = false;
     if (info.installed || info.old) {
       const w = $('#wWas'); w.hidden = false;
       w.lastChild.textContent = info.installed ? 'Уже установлена — обновлю, настройки и ключ Groq останутся' : 'Нашёл прошлую версию — заменю её, настройки и ключ Groq останутся';
