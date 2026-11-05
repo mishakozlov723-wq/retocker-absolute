@@ -62,6 +62,18 @@
       listen('asr', e => { const p = e.payload || {}; if (p.id === locId && locCb) locCb(p.text || ''); });
       listen('asr_dl', e => { if (e.payload && e.payload.state === 'done') locCheck(); });
       locCheck();
+      // a profile tied to a program turns on by itself when that program comes to the front (only while idle)
+      let profApp = '';
+      setInterval(() => {
+        if (lastState !== 'idle' || !RA.profFor({ name: '?' })) return;
+        invoke('fg_app').then(a => {
+          const k = a && RA.appKey(a.exe || a.name); if (!k || /^retocker/.test(k) || k === profApp) return;
+          profApp = k; const id = RA.profFor(a), p = RA.profs();
+          if (!id || !p || id === p.cur || lastState !== 'idle') return;
+          RA.useProf(id); cap.reload(); syncHotkey(cap.S); locCheck();
+          log('profile ' + id + ' for ' + k);
+        }).catch(() => {});
+      }, 700);
       addEventListener('storage', e => { if (e.key === RA.KEY) syncHotkey(RA.load()); });
       log(`capsule up ${innerWidth}x${innerHeight} dpr ${devicePixelRatio} hk ${api.S.hk} ${api.S.mode}`);
     }

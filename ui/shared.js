@@ -13,7 +13,7 @@
     // the local speech model (when it is downloaded): words at once; the colour of the corrections afterwards
     fast: true, fixc: 'blue',
     // after speech
-    review: false, clean: true, smart: true,
+    review: false, revBtn: true, clean: true, smart: true,
     // control
     hk: 'Ctrl+Win', mode: 'hold', pos: 'bottom', off: 22, fx: .5, fy: .62, hideFs: true,
     // recognition & insertion
@@ -39,7 +39,42 @@
     for (const k in S) if (!(k in DEF)) delete S[k];
     return S;
   }
-  function save(S) { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+  // profiles: whole sets of settings; the one turned on keeps every change. {list:[{id,name,apps,v}], cur, base}
+  const PROF = 'ra.prof';
+  function profs() {
+    try {
+      const p = JSON.parse(localStorage.getItem(PROF) || 'null');
+      if (!p || !Array.isArray(p.list) || !p.list.length) return null;
+      p.list.forEach(x => { if (!Array.isArray(x.apps)) x.apps = []; });
+      if (!p.list.some(x => x.id === p.cur)) p.cur = p.list[0].id;
+      if (!p.list.some(x => x.id === p.base)) p.base = (p.list.find(x => !x.apps.length) || p.list[0]).id;
+      return p;
+    } catch (e) { return null; }
+  }
+  function setProfs(p) { try { if (p) localStorage.setItem(PROF, JSON.stringify(p)); else localStorage.removeItem(PROF); } catch (e) {} }
+  function save(S) {
+    try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
+    const p = profs(); if (!p) return;
+    const was = JSON.stringify(p);
+    // the dictionary and the microphone are the same in every profile
+    p.list.forEach(x => { if (x.id === p.cur) x.v = { ...S }; else { x.v.dict = S.dict; x.v.mic = S.mic; } });
+    if (JSON.stringify(p) !== was) setProfs(p);
+  }
+  // turn a profile on (manual: a profile without programs becomes the one for all the other programs)
+  function useProf(id, manual) {
+    const p = profs(), c = p && p.list.find(x => x.id === id); if (!c) return null;
+    p.cur = id; if (manual && !c.apps.length) p.base = id; setProfs(p);
+    const S = { ...DEF, ...c.v }; for (const k in S) if (!(k in DEF)) delete S[k];
+    save(S); return S;
+  }
+  const appKey = s => String(s || '').trim().toLowerCase().replace(/\.exe$/, '');
+  // which profile belongs in front of this program (null: no profile is tied to programs)
+  function profFor(a) {
+    const p = profs(); if (!p || !p.list.some(x => x.apps.length)) return null;
+    const ks = [a && a.name, a && a.exe].map(appKey).filter(Boolean); if (!ks.length) return null;
+    const m = p.list.find(x => x.apps.some(n => ks.includes(appKey(n))));
+    return m ? m.id : p.base;
+  }
 
   // the Groq key and the proxy address live only here, on this computer
   const AUTH = 'ra.auth';
@@ -125,6 +160,6 @@
   const emitTo = (label, ev, p) => T ? T.event.emitTo(label, ev, p === undefined ? null : p).catch(() => {}) : Promise.resolve();
   const log = m => { try { invoke('log', { msg: String(m) }).catch(() => {}); } catch (e) {} };
 
-  window.RA = { KEY, DEF, PK, PRESETS, BGS, ACCS, FIXC, pcmTap, asrFeed, load, save, AUTH, auth, setAuth, isProxy, hasKey, STATS, stats, addStat, dayKey,
+  window.RA = { KEY, DEF, PK, PROF, profs, setProfs, useProf, profFor, appKey, PRESETS, BGS, ACCS, FIXC, pcmTap, asrFeed, load, save, AUTH, auth, setAuth, isProxy, hasKey, STATS, stats, addStat, dayKey,
     pl, words_, wc, esc, hkPart, hkParts, hkLabel, isModOnly, rgb, lum, contrast, hexA, invoke, listen, emitTo, log, tauri: !!T };
 })();
