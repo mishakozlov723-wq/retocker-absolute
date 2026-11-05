@@ -14,14 +14,22 @@
   склеиваются в `ui/engine.js` скриптом `scripts/prepare.mjs`.
 - `proxy/Code.gs` — посредник для Groq (тот же код программа даёт скопировать в настройках).
 
-Сборка — GitHub Actions (`.github/workflows/build.yml`): установщик NSIS и portable-версия, проверка на
-чистой Windows (`scripts/smoke.ps1`, скриншоты — в ветке `ci-shots`). Коммит с `[release]` в сообщении
-выкладывает релиз.
+Сборка — GitHub Actions (`.github/workflows/build.yml`). Получается один exe: с «Setup» в имени он
+устанавливает сам себя (окно `ui/setup.html`, код `src-tauri/src/setup.rs`), с любым другим именем — это сама
+программа (portable). Удаление — `retocker-voice.exe --uninstall` (его вызывает «Приложения» в Windows);
+`--silent` — то же без окон. Проверка на чистой Windows: `scripts/smoke.ps1` (программа) и `scripts/setup-check.ps1`
+(установка поверх старой NSIS-версии, обновление, удаление); скриншоты и журналы — в ветке `ci-shots`.
+Коммит с `[release]` в сообщении выкладывает релиз.
 
-Для всех файлы лежат в публичном хранилище `retocker-absolute-download` (только exe, без кода): Firebase на
-бесплатном тарифе не принимает exe. Страница скачивания и `latest.json` (по нему программа узнаёт о новой
-версии) — на https://retocker-voice.web.app/absolute/, ссылки ведут на `releases/latest/download/…`.
+Обновления (`src-tauri/src/upd.rs`): программа читает `latest.json` (из последнего релиза в публичном хранилище,
+запасной адрес — Firebase), скачивает exe, сверяет SHA-256 и подпись Ed25519 и подменяет себя (работающий exe
+можно переименовать) — потом перезапускается. Подписывает `scripts/sign.mjs` ключом из секрета `UPDATE_KEY`;
+открытая половина ключа зашита в `upd.rs`.
+
+Для всех файлы лежат в публичном хранилище `retocker-absolute-download` (только exe и `latest.json`, без кода):
+Firebase на бесплатном тарифе не принимает exe. Страница скачивания и запасной `latest.json` — на
+https://retocker-voice.web.app/absolute/.
 
 До 1.0.19 программа называлась Retocker Absolute. Поэтому `identifier` остался `com.retocker.absolute` (там лежат
-настройки и ключ), а установщик (`src-tauri/installer-hooks.nsh`) тихо удаляет старую копию и переносит автозапуск
-на новое имя (запасной вариант — `win::autostart_migrate` при старте программы).
+настройки и ключ). До 1.0.20 включительно ставил NSIS; новый установщик сам тихо удаляет эти старые копии
+(и «Retocker Absolute», и «Retocker Voice»), настройки при этом остаются.
