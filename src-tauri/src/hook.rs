@@ -2,7 +2,7 @@
 //! It knows the dictation hotkey (any combo, also modifiers only, e.g. Ctrl+Win), swallows the main key of a
 //! combo so the app under the cursor never sees it, catches Esc / Enter while the capsule waits for them, and
 //! can record a new hotkey for the settings window (then every key goes only to us, so Win never opens Start).
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -226,6 +226,7 @@ pub fn set_paused(on: bool) {
 
 unsafe extern "system" fn proc_(code: i32, wp: WPARAM, lp: LPARAM) -> LRESULT {
   if code == HC_ACTION as i32 {
+    LAST_KEY.store(now_ms(), Ordering::Relaxed);
     let kb = &*(lp.0 as *const KBDLLHOOKSTRUCT);
     if !(kb.flags.0 & LLKHF_INJECTED.0 != 0 && kb.dwExtraInfo == MARK) && handle(wp.0 as u32, kb) {
       return LRESULT(1);
@@ -414,12 +415,66 @@ fn sync_held(s: &mut St, cur: u8) {
   }
 }
 
+static T0: OnceLock<Instant> = OnceLock::new();
+fn now_ms() -> u64 {
+  T0.get_or_init(Instant::now).elapsed().as_millis() as u64
+}
+/// when the hook last heard any key (ms since start)
+static LAST_KEY: AtomicU64 = AtomicU64::new(0);
+static HOOK_TID: AtomicU32 = AtomicU32::new(0);
+const WM_REHOOK: u32 = WM_APP + 1;
+
+/// Windows can drop a keyboard hook without a word (for example when the computer was too busy to answer in
+/// time). The overlay loop ticks this: a modifier the system sees pressed that the hook never heard of
+/// means the hook is gone, so it is set up again (the next press works).
+#[derive(Default)]
+pub struct Watch {
+  down: bool,
+  press: Option<u64>,
+  polled: u64,
+  fixed: u64,
+  fixes: u32,
+}
+impl Watch {
+  pub fn tick(&mut self) {
+    let now = now_ms();
+    if now < self.polled + 40 {
+      return;
+    }
+    self.polled = now;
+    let down = [0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0x5B, 0x5C].iter().any(|v| unsafe { GetAsyncKeyState(*v) } as u16 & 0x8000 != 0);
+    if down && !self.down {
+      self.press = Some(now);
+    }
+    self.down = down;
+    let Some(p) = self.press else { return };
+    if now < p + 300 {
+      return;
+    }
+    self.press = None;
+    if LAST_KEY.load(Ordering::Relaxed) + 250 < p && now > self.fixed + 5000 {
+      self.fixed = now;
+      self.fixes += 1;
+      if self.fixes <= 20 {
+        crate::logx::log("keyboard hook missed a key: setting it up again");
+      }
+      let tid = HOOK_TID.load(Ordering::Relaxed);
+      if tid != 0 {
+        unsafe {
+          let _ = PostThreadMessageW(tid, WM_REHOOK, WPARAM(0), LPARAM(0));
+        }
+      }
+    }
+  }
+}
+
 /// Starts the hook thread; `on_ev` runs on a separate dispatcher thread (never inside the hook).
 pub fn start(on_ev: impl Fn(Ev) + Send + 'static) {
   DEBUG.store(std::env::var("RA_DEBUG").map(|v| v == "1").unwrap_or(false), Ordering::Relaxed);
   if debug() {
     crate::logx::log("debug log on (RA_DEBUG=1)");
   }
+  let _ = now_ms();
   let (tx, rx) = channel::<Ev>();
   let _ = TX.set(Mutex::new(tx));
   std::thread::spawn(move || {
@@ -428,7 +483,7 @@ pub fn start(on_ev: impl Fn(Ev) + Send + 'static) {
         Ev::Mask => crate::paste::tap_mask(),
         Ev::Dbg(m) => crate::logx::log(&m),
         e => {
-          if DEBUG.load(Ordering::Relaxed) {
+          if debug() {
             crate::logx::log(&format!("hook event {e:?}"));
           }
           on_ev(e)
@@ -439,13 +494,20 @@ pub fn start(on_ev: impl Fn(Ev) + Send + 'static) {
   std::thread::spawn(|| unsafe {
     let hmod: HINSTANCE = GetModuleHandleW(None).map(|h| h.into()).unwrap_or_default();
     let tid = windows::Win32::System::Threading::GetCurrentThreadId();
-    match SetWindowsHookExW(WH_KEYBOARD_LL, Some(proc_), Some(hmod), 0) {
-      Ok(h) => crate::logx::log(&format!("keyboard hook on (thread {tid}, hook {:?})", h.0)),
-      Err(e) => crate::logx::log(&format!("keyboard hook failed: {e}")),
-    }
-    if debug() {
-      let _ = SetTimer(None, 0, 4000, None);
-    }
+    HOOK_TID.store(tid, Ordering::Relaxed);
+    let install = || match SetWindowsHookExW(WH_KEYBOARD_LL, Some(proc_), Some(hmod), 0) {
+      Ok(h) => {
+        crate::logx::log(&format!("keyboard hook on (thread {tid})"));
+        Some(h)
+      }
+      Err(e) => {
+        crate::logx::log(&format!("keyboard hook failed: {e}"));
+        None
+      }
+    };
+    let mut hook = install();
+    // a steady tick keeps this thread's queue awake
+    let _ = SetTimer(None, 0, 5000, None);
     let mut m = MSG::default();
     loop {
       let r = GetMessageW(&mut m, None, 0, 0);
@@ -453,9 +515,20 @@ pub fn start(on_ev: impl Fn(Ev) + Send + 'static) {
         crate::logx::log(&format!("keyboard hook loop ended ({})", r.0));
         break;
       }
-      if m.message == WM_TIMER && m.hwnd.0.is_null() {
-        crate::logx::log(&format!("hook thread alive, keys seen {}", SEEN.load(Ordering::Relaxed)));
-        continue;
+      if m.hwnd.0.is_null() {
+        if m.message == WM_TIMER {
+          if debug() {
+            crate::logx::log(&format!("hook thread alive, keys seen {}", SEEN.load(Ordering::Relaxed)));
+          }
+          continue;
+        }
+        if m.message == WM_REHOOK {
+          if let Some(h) = hook.take() {
+            let _ = UnhookWindowsHookEx(h);
+          }
+          hook = install();
+          continue;
+        }
       }
       let _ = TranslateMessage(&m);
       DispatchMessageW(&m);

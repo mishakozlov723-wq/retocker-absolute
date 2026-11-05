@@ -195,8 +195,10 @@ fn overlay_loop(app: AppHandle) {
     let mut last_area = Instant::now();
     let mut last_top = Instant::now();
     let mut last_fs = Instant::now();
+    let mut watch = hook::Watch::default();
     loop {
       std::thread::sleep(Duration::from_millis(12));
+      watch.tick();
       let (cx, cy) = win::cursor();
       let (x, y) = (cx - area.left, cy - area.top);
       let inside = HITS.lock().map(|r| r.iter().any(|q| x >= q[0] && y >= q[1] && x < q[0] + q[2] && y < q[1] + q[3])).unwrap_or(false);
