@@ -87,6 +87,10 @@
 .ldot{width:7px;height:7px;border-radius:50%;background:var(--acc);flex:none}
 .pc[data-mode=proc] .ldot,.pc[data-mode=review] .ldot{opacity:.6}
 .pc .grow{flex:1}
+.lchk{display:none;height:22px;padding:0 9px;border-radius:6px;font-size:11.5px;font-weight:600;background:var(--c-btn);color:var(--c-tx2);transition:background-color .12s,color .12s,box-shadow .12s;align-items:center;white-space:nowrap;flex:none}
+.lchk:hover{background:var(--c-btnh);color:var(--c-tx)}
+.lchk.on{background:transparent;color:var(--c-tx);box-shadow:inset 0 0 0 1.5px var(--acc)}
+.pc[data-mode=rec][data-rb] .lchk{display:inline-flex}
 .lcnt{font-variant-numeric:tabular-nums;color:var(--c-tx2);font-weight:600}
 /* the text scrolls without a scrollbar; soft edges show there is more above / below (set from JS) */
 @property --ft{syntax:'<length>';inherits:false;initial-value:0px}

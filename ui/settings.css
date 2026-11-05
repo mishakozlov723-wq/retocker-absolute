@@ -272,3 +272,23 @@ select.in option{background:#262626}
 .asrout{min-height:44px;max-height:120px;overflow:auto;border-radius:9px;background:rgba(255,255,255,.05);border:1px solid var(--ln);padding:9px 11px;font-size:13.5px;line-height:1.5;color:var(--tx);user-select:text;-webkit-user-select:text}
 .asrout .tent{opacity:.55}
 .asrout .ph{color:var(--tx3)}
+
+/* profiles */
+.ni .nsub{margin-left:auto;font-size:11px;font-weight:600;color:var(--tx3);max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pfs{display:flex;flex-direction:column;gap:8px;margin:4px 10px 0}
+.pf{background:var(--card);border:1px solid var(--ln);border-radius:11px;padding:10px 12px 11px;display:flex;flex-direction:column;gap:9px;transition:border-color .15s}
+.pf.on{border-color:rgba(255,255,255,.3)}
+.pft{display:flex;align-items:center;gap:8px}
+.pn{flex:1;min-width:0;height:30px;margin-left:-6px;padding:0 6px;border-radius:6px;border:1px solid transparent;background:transparent;outline:none;font-size:14px;font-weight:700;user-select:text;-webkit-user-select:text;transition:border-color .12s,background .12s}
+.pn:hover{background:var(--hv)}
+.pn:focus{border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.05)}
+.pf .tag{font-size:11px;font-weight:650;color:var(--tx3);white-space:nowrap}
+.pf .ix{width:30px;padding:0;justify-content:center;color:var(--tx3)}
+.pf .ix:hover{color:var(--bad)}
+.pfa{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:12px;color:var(--tx2);font-weight:600}
+.pfa .ac{height:26px;display:inline-flex;align-items:center;gap:6px;padding:0 6px 0 10px;border-radius:13px;background:var(--seg);box-shadow:0 0 0 1px var(--ln);color:var(--tx);font-size:12px}
+.pfa .ac button{width:16px;height:16px;border-radius:50%;display:grid;place-items:center;color:var(--tx3)}
+.pfa .ac button:hover{background:var(--hv2);color:var(--tx)}
+.pfa .ac svg{width:10px;height:10px}
+.pfa .dd{height:26px;font-size:12px}
+.pfa .in{height:26px;width:150px;font-size:12px}
