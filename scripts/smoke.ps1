@@ -102,37 +102,28 @@ Log "window under the mouse on the capsule: '$([W]::At($cx, $cy))'"
 Shot "02-hover"
 [W]::SetCursorPos($cx + 200, $cy - 200) | Out-Null; Start-Sleep -Milliseconds 600
 
-# can this machine type at all? (input injection into the session) and do hooks hear it?
-[H]::Start(); Start-Sleep -Milliseconds 500
-Log "test hook: $([H]::Info)"
-Key 0xA2 0x1D 0; Start-Sleep -Milliseconds 120
-Log "keybd_event LCtrl down -> system sees LCtrl: $([W]::GetAsyncKeyState(0xA2) -band 0x8000)"
-Key 0xA2 0x1D 2; Start-Sleep -Milliseconds 120
-Log "SendInput LCtrl down: $([W]::Send(0xA2, 0x1D, 0)) -> system sees LCtrl: $([W]::GetAsyncKeyState(0xA2) -band 0x8000)"
-Log "SendInput LCtrl up: $([W]::Send(0xA2, 0x1D, 2))"
-Start-Sleep -Milliseconds 200
-Log "test hook saw $([H]::Count) key events (4 sent)"
-Start-Sleep -Milliseconds 300
-
-# the default hotkey: hold Ctrl+Win (left Ctrl, then left Win) like a real keyboard
+# the default hotkey: hold Ctrl+Win (left Ctrl, then left Win) like a real keyboard.
+# There is no Groq key and no microphone here, so the capsule should say so.
 Key 0xA2 0x1D 0; Start-Sleep -Milliseconds 80; Key 0x5B 0x5B 1
-Start-Sleep -Milliseconds 1800
+Start-Sleep -Milliseconds 1500
 Shot "03-hold"
 Key 0x5B 0x5B 3; Start-Sleep -Milliseconds 40; Key 0xA2 0x1D 2
 Start-Sleep -Milliseconds 2500
 Shot "04-released"
 Log "start menu check — foreground: $([W]::Title([W]::GetForegroundWindow()))"
-
-# the same through the app's own test entry (RA_DEBUG): the hook logic, the event, the capsule
-# (there is no microphone here, so the capsule should end up saying so)
-Start-Process $exe -ArgumentList '--test-keys', 'A2+,5B+' | Out-Null
+# once more (if the first press was missed, the watchdog has set the hook up again by now)
+Key 0xA2 0x1D 0; Start-Sleep -Milliseconds 80; Key 0x5B 0x5B 1
+Start-Sleep -Milliseconds 900
+Shot "05-hold-again"
+Key 0x5B 0x5B 3; Start-Sleep -Milliseconds 40; Key 0xA2 0x1D 2
 Start-Sleep -Milliseconds 1500
-Shot "08-test-hold"
-Start-Process $exe -ArgumentList '--test-keys', '5B-,A2-' | Out-Null
-Start-Sleep -Milliseconds 1200
-Shot "09-test-released"
-Start-Sleep 3
-Shot "10-test-later"
+
+# for the record: does this machine deliver keys to a hook of our own
+[H]::Start(); Start-Sleep -Milliseconds 500
+Key 0xA2 0x1D 0; Start-Sleep -Milliseconds 120
+Log "test hook ($([H]::Info)): system sees LCtrl: $([W]::GetAsyncKeyState(0xA2) -band 0x8000)"
+Key 0xA2 0x1D 2; Start-Sleep -Milliseconds 200
+Log "test hook saw $([H]::Count) key events (2 sent)"
 
 # the cross only hides the settings; a second start brings them back
 Click ($wx + 978) ($wy + 17); Start-Sleep -Milliseconds 1200

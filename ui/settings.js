@@ -471,7 +471,7 @@ async function checkUpdate(manual) {
     }
     const b = $('#updBtn'); if (b) b.hidden = !upd;
     refreshHome();
-  } catch (e) { if (st && manual) { st.className = 'status bad'; st.lastChild.textContent = 'Не получилось проверить — нет связи'; } }
+  } catch (e) { if (st) { st.className = manual ? 'status bad' : 'status'; st.lastChild.textContent = manual ? 'Не получилось проверить — нет связи' : 'Проверю позже'; } }
 }
 function buildAbout() {
   page('about'); head('О программе');
