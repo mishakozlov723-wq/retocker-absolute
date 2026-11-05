@@ -5,7 +5,7 @@
   const DEF = {
     // look
     bg: 'graphite', bgc: '#2c2c2c', acc: '#ffffff', wcol: 'accent', shape: 'pill', scale: 100, border: true, shadow: true, glow: 25,
-    anim: 'smooth', speed: 100, idle: 'line', breathe: false, idleOp: 85, hint: true,
+    anim: 'smooth', speed: 100, idle: 'line', idleSc: 100, breathe: false, idleOp: 85, hint: true,
     wave: 'bars', bars: 9, sens: 100,
     timer: true, btns: false, proc: 'shimmer', sounds: false,
     // live text

@@ -122,6 +122,15 @@ pub fn fullscreen_front() -> bool {
     if c == "Progman" || c == "WorkerW" || c == "Shell_TrayWnd" {
       return false;
     }
+    // a maximized window (with an auto-hiding taskbar it covers the whole screen) is not fullscreen;
+    // real fullscreen (games, video, F11 in a browser) has no title bar and is not "maximized"
+    if IsZoomed(h).as_bool() {
+      return false;
+    }
+    let st = GetWindowLongW(h, GWL_STYLE) as u32;
+    if st & WS_CAPTION.0 == WS_CAPTION.0 {
+      return false;
+    }
     let mut r = RECT::default();
     if GetWindowRect(h, &mut r).is_err() {
       return false;
