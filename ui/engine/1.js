@@ -14,7 +14,7 @@ stage.insertAdjacentHTML('beforeend', `
 <div class="shd" id="pShd" aria-hidden="true"></div>
 <svg class="shape" id="pSvg" aria-hidden="true"><defs><linearGradient id="pGl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a3a3d" stop-opacity=".9"/><stop offset="1" stop-color="#232325" stop-opacity=".86"/></linearGradient></defs><rect id="pRect"/><rect id="pRectA"/></svg>
 <div class="pc" id="pc" aria-hidden="true"><div class="pci" id="pci">
-  <div class="lh"><i class="ldot" id="lDot"></i><span id="lTitle">Слушаю…</span><span class="grow"></span><span class="lcnt" id="lCnt"></span></div>
+  <div class="lh"><i class="ldot" id="lDot"></i><span id="lTitle">Слушаю…</span><span class="grow"></span><button class="lchk" id="lRev" data-k="rev1">Проверю перед вставкой</button><span class="lcnt" id="lCnt"></span></div>
   <div class="lb" id="lBody"><div class="lt" id="lText"></div></div>
   <div class="lf" id="lFoot"><span class="lk" id="lKeys">Enter — вставить · Esc — отмена</span><span class="grow"></span><button class="lbtn" data-k="copy">Копировать</button><button class="lbtn pri" data-k="insert">Вставить</button></div>
 </div></div>
@@ -38,6 +38,7 @@ const $ = s => stage.querySelector(s);
 const guide = $('.guide');
 const cSvg = $('#cSvg'), cRect = $('#cRect'), cShd = $('#cShd'), pSvg = $('#pSvg'), pRect = $('#pRect'), pRectA = $('#pRectA'), pShd = $('#pShd');
 const cc = $('#cc'), glowEl = $('#glow'), pc = $('#pc'), pci = $('#pci');
+const lRev = $('#lRev'); let rev1 = false; // «Проверю перед вставкой» — only for this dictation
 const lText = $('#lText'), lTitle = $('#lTitle'), lCnt = $('#lCnt'), lBody = $('#lBody'), lDot = $('#lDot');
 const wave = $('#wave'), wctx = wave.getContext('2d'), timeEl = $('#time'), procTxt = $('#procTxt'), doneTxt = $('#doneTxt'), hintTxt = $('#hintTxt'), hintB = $('#hintB'), errTxt = $('#errTxt');
 const recL = $('#recL'), recC = $('#recC'), recR = $('#recR'), cDot = $('#cDot'), cRing = $('#cRing'), tickPath = $('#tick');
@@ -257,7 +258,7 @@ function retarget(o = {}) {
   if (z.g === 'rec') layoutRec();
   if (o.instant) {
     G.w.jump(z.w); G.h.jump(z.h); G.sq.jump(0); G.px.jump(0); G.py.jump(0);
-    for (const k in GR) { const g = GR[k]; g.op.jump(k === z.g ? 1 : 0); g.sc.jump(1); g.bl.jump(0); }
+    for (const k in GR) { const g = GR[k]; g.op.jump(k === z.g ? 1 : 0); g.sc.jump(1); g.bl.jump(0); g.flat = k === z.g && k !== 'hint' && k !== 'mini'; }
     curG = z.g; TK.jump(1);
   } else {
     if (!same || G.w.isAnimating() || G.h.isAnimating()) morph(z);
@@ -287,13 +288,16 @@ function morph(z) {
 }
 function enterG(g, late = 0) {
   const st = sty(), d = (S.anim === 'drop' ? .06 : .03) + late;
-  if (g.op.get() < .05) { g.sc.jump(st.inS); g.bl.jump(st.blur); }
+  // from nothing: shown at its real size (see drawG); already visible (coming back): scales back as before
+  g.flat = g.op.get() < .05 && g.key !== 'hint' && g.key !== 'mini';
+  if (g.flat) { g.sc.jump(1); g.bl.jump(st.blur); } else if (g.op.get() < .05) { g.sc.jump(st.inS); g.bl.jump(st.blur); }
   animate(g.op, 1, TW(.22, d, [.3, 0, .2, 1]));
   animate(g.sc, 1, SPRu(st.vd * .92, Math.min(.42, st.b + .06), d * .5));
   if (g.bl.get() > 0) animate(g.bl, 0, TW(.3, d, [.2, .7, .2, 1]));
 }
 function exitG(g, sync) {
   const st = sty();
+  g.flat = false;
   if (sync) {
     animate(g.op, 0, TW(st.vd * .9, 0, [.6, 0, .85, .3]));
     animate(g.sc, st.outS, TW(st.vd, 0, [.4, 0, .6, 1]));
@@ -340,11 +344,11 @@ function draw() {
   const o3 = f3(op);
   setS(cSvg, 'opacity', o3); setS(cc, 'opacity', o3);
   if (S.shadow) { setS(cShd, 'transform', `translate(${f2(x)}px,${f2(y)}px)`); setS(cShd, 'width', f2(W) + 'px'); setS(cShd, 'height', f2(H) + 'px'); setS(cShd, 'borderRadius', f2(r * s) + 'px'); setS(cShd, 'opacity', o3); }
-  // content rides with the shape; snapped to whole pixels when nothing moves, so text stays crisp
-  const still = !(G.h.isAnimating() || G.px.isAnimating() || G.py.isAnimating() || G.dx.isAnimating() || G.s.isAnimating() || G.sq.isAnimating() || dragging);
-  const tx = still ? snap(cx) : cx, ty = still ? snap(cy) : cy;
+  // content rides with the shape, always in whole device pixels (like the live panel): nothing to snap when it
+  // stops, so it does not jump at the end of the opening; the clip follows the real (unsnapped) shape
+  const tx = snap(cx), ty = snap(cy), ox = (cx - tx) / s, oy = (cy - ty) / s;
   setS(cc, 'transform', `translate(${f2(tx)}px,${f2(ty)}px) scale(${f4(s)})`);
-  setS(cc, 'clipPath', `inset(${f2(CH / 2 - h / 2)}px ${f2(CW / 2 - w / 2)}px round ${f2(r)}px)`);
+  setS(cc, 'clipPath', `inset(${f2(CH / 2 - h / 2 + oy)}px ${f2(CW / 2 - w / 2 - ox)}px ${f2(CH / 2 - h / 2 - oy)}px ${f2(CW / 2 - w / 2 + ox)}px round ${f2(r)}px)`);
   for (const k in GR) drawG(GR[k], w, h);
   setS(glowEl, 'width', f2(W) + 'px'); setS(glowEl, 'height', f2(H) + 'px'); setS(glowEl, 'borderRadius', f2(r * s) + 'px');
   glowDraw();
@@ -359,12 +363,16 @@ function drawG(g, w, h) {
     fit = Math.min(1, room);
     const t = clamp((room - .86) / .14, 0, 1); o *= t * t * (3 - 2 * t);
   } else if (g.key === 'mini') fit = Math.min((S.idleSc || 100) / 100, w / 38, h / 18); // grows with «Размер в покое»
+  else if (g.flat) { // opened from nothing: real size (no rescaled, re-drawn text), shows up once the shape has room
+    fit = 1;
+    const t = clamp((Math.min(w / (g.tw || w || 1), h / (g.th || h || 1)) - .6) / .3, 0, 1); o *= t * t * (3 - 2 * t);
+  }
   else fit = Math.min(1, w / (g.tw || w || 1), h / (g.th || h || 1));
   const on = o > .003;
   if (on !== g.on) { g.on = on; g.el.classList.toggle('on', on); }
   if (!on) return;
   setS(g.el, 'opacity', f3(o));
-  setS(g.el, 'transform', `scale(${f4(Math.max(0, fit * g.sc.get()))})`);
+  setS(g.el, 'transform', g.flat ? 'none' : `scale(${f4(Math.max(0, fit * g.sc.get()))})`);
   const b = g.bl.get(); setS(g.el, 'filter', b > .05 ? `blur(${f2(b)}px)` : 'none');
   if (g.key === 'done') setS(tickPath, 'strokeDashoffset', f2(TLEN * (1 - TK.get())));
 }
@@ -414,6 +422,7 @@ function drawPanel() {
 }
 function setMode() {
   pc.dataset.mode = state === 'review' ? 'review' : state === 'rec' ? 'rec' : 'proc';
+  pc.toggleAttribute('data-rb', !!(S.revBtn && !S.review)); lRev.classList.toggle('on', rev1);
   lTitle.textContent = state === 'review' ? 'Проверь текст' : state === 'rec' ? 'Слушаю…' : (S.clean ? 'Причёсываю…' : 'Распознаю…');
 }
 function panelTarget() {

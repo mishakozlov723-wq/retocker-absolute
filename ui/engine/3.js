@@ -37,6 +37,7 @@ function action(k) {
 }
 pc.addEventListener('click', e => {
   const b = e.target.closest('[data-k]'); if (!b) return;
+  if (b.dataset.k === 'rev1') { if (state === 'rec') { rev1 = !rev1; b.classList.toggle('on', rev1); } return; }
   if (b.dataset.k === 'insert') insert(lText.innerText);
   if (b.dataset.k === 'copy') {
     const t = lText.innerText.trim();
