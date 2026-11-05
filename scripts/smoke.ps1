@@ -32,6 +32,28 @@ public static class W {
   public static string At(int x, int y) { var p = new POINT(); p.X = x; p.Y = y; return Title(GetAncestor(WindowFromPoint(p), 2)); }
 }
 "@
+# a minimal keyboard hook of our own: tells whether this machine delivers key events to hooks at all
+Add-Type @"
+using System; using System.Runtime.InteropServices;
+public static class H {
+  public delegate IntPtr Proc(int code, IntPtr wp, IntPtr lp);
+  [StructLayout(LayoutKind.Sequential)] public struct MSG { public IntPtr hwnd; public uint message; public IntPtr wParam; public IntPtr lParam; public uint time; public int x; public int y; }
+  [DllImport("user32.dll", SetLastError = true)] static extern IntPtr SetWindowsHookEx(int id, Proc fn, IntPtr mod, uint tid);
+  [DllImport("user32.dll")] static extern IntPtr CallNextHookEx(IntPtr h, int c, IntPtr w, IntPtr l);
+  [DllImport("user32.dll")] static extern int GetMessage(out MSG m, IntPtr h, uint a, uint b);
+  [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern IntPtr GetModuleHandle(string n);
+  public static int Count = 0; public static string Info = ""; static Proc keep; static IntPtr hh;
+  public static void Start() {
+    var t = new System.Threading.Thread(() => {
+      keep = (c, w, l) => { Count++; return CallNextHookEx(hh, c, w, l); };
+      hh = SetWindowsHookEx(13, keep, GetModuleHandle(null), 0);
+      Info = "hook " + hh + " err " + Marshal.GetLastWin32Error();
+      MSG m; while (GetMessage(out m, IntPtr.Zero, 0, 0) > 0) {}
+    });
+    t.IsBackground = true; t.Start();
+  }
+}
+"@
 New-Item -ItemType Directory -Force shots | Out-Null
 function Log($s) { $s | Tee-Object -FilePath smoke.txt -Append }
 function Shot($n) {
@@ -80,12 +102,16 @@ Log "window under the mouse on the capsule: '$([W]::At($cx, $cy))'"
 Shot "02-hover"
 [W]::SetCursorPos($cx + 200, $cy - 200) | Out-Null; Start-Sleep -Milliseconds 600
 
-# can this machine type at all? (input injection into the session)
+# can this machine type at all? (input injection into the session) and do hooks hear it?
+[H]::Start(); Start-Sleep -Milliseconds 500
+Log "test hook: $([H]::Info)"
 Key 0xA2 0x1D 0; Start-Sleep -Milliseconds 120
 Log "keybd_event LCtrl down -> system sees LCtrl: $([W]::GetAsyncKeyState(0xA2) -band 0x8000)"
 Key 0xA2 0x1D 2; Start-Sleep -Milliseconds 120
 Log "SendInput LCtrl down: $([W]::Send(0xA2, 0x1D, 0)) -> system sees LCtrl: $([W]::GetAsyncKeyState(0xA2) -band 0x8000)"
 Log "SendInput LCtrl up: $([W]::Send(0xA2, 0x1D, 2))"
+Start-Sleep -Milliseconds 200
+Log "test hook saw $([H]::Count) key events (4 sent)"
 Start-Sleep -Milliseconds 300
 
 # the default hotkey: hold Ctrl+Win (left Ctrl, then left Win) like a real keyboard

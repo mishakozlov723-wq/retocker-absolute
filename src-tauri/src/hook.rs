@@ -438,12 +438,25 @@ pub fn start(on_ev: impl Fn(Ev) + Send + 'static) {
   });
   std::thread::spawn(|| unsafe {
     let hmod: HINSTANCE = GetModuleHandleW(None).map(|h| h.into()).unwrap_or_default();
+    let tid = windows::Win32::System::Threading::GetCurrentThreadId();
     match SetWindowsHookExW(WH_KEYBOARD_LL, Some(proc_), Some(hmod), 0) {
-      Ok(_) => crate::logx::log("keyboard hook on"),
+      Ok(h) => crate::logx::log(&format!("keyboard hook on (thread {tid}, hook {:?})", h.0)),
       Err(e) => crate::logx::log(&format!("keyboard hook failed: {e}")),
     }
+    if debug() {
+      let _ = SetTimer(None, 0, 4000, None);
+    }
     let mut m = MSG::default();
-    while GetMessageW(&mut m, None, 0, 0).as_bool() {
+    loop {
+      let r = GetMessageW(&mut m, None, 0, 0);
+      if r.0 == 0 || r.0 == -1 {
+        crate::logx::log(&format!("keyboard hook loop ended ({})", r.0));
+        break;
+      }
+      if m.message == WM_TIMER && m.hwnd.0.is_null() {
+        crate::logx::log(&format!("hook thread alive, keys seen {}", SEEN.load(Ordering::Relaxed)));
+        continue;
+      }
       let _ = TranslateMessage(&m);
       DispatchMessageW(&m);
     }
