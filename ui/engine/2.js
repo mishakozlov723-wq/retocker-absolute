@@ -197,6 +197,132 @@ async function cleanAnim(f) {
   if (rm.length || sw.length) { magic(rm, sw); await sleep(620 / k); }
 }
 
+/* ---------------- final text over the live (Vosk) text: what stays glides to its new place,
+   only the letters that really changed re-write themselves, in one soft wave left → right */
+const lev = (a, b) => {
+  const m = b.length; let p = Array.from({ length: m + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) { const q = [i]; for (let j = 1; j <= m; j++) q[j] = Math.min(p[j] + 1, q[j - 1] + 1, p[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); p = q; }
+  return p[m];
+};
+// Needleman–Wunsch: pairs [i, j] (-1 = nothing on that side); sub(i, j) = cost of pairing or Infinity
+function alignNW(n, m, sub) {
+  const D = Array.from({ length: n + 1 }, (_, i) => Float32Array.from({ length: m + 1 }, (_, j) => i + j));
+  for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++) D[i][j] = Math.min(D[i - 1][j] + 1, D[i][j - 1] + 1, D[i - 1][j - 1] + sub(i - 1, j - 1));
+  const out = []; let i = n, j = m;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && Math.abs(D[i][j] - (D[i - 1][j - 1] + sub(i - 1, j - 1))) < 1e-4) { out.push([i - 1, j - 1]); i--; j--; }
+    else if (i > 0 && Math.abs(D[i][j] - (D[i - 1][j] + 1)) < 1e-4) { out.push([i - 1, -1]); i--; }
+    else { out.push([-1, j - 1]); j--; }
+  }
+  return out.reverse();
+}
+// the colour corrected words flash in (settings: «Цвет исправлений»); null — no flash
+function fixColor() {
+  const c = RA.FIXC.find(x => x[0] === S.fixc) || RA.FIXC[0];
+  if (c[0] === 'off') return null;
+  if (c[0] === 'acc') return S.acc;
+  return LIGHT ? c[2] : c[1];
+}
+function fixText(txt) {
+  const k = K(), nw = String(txt || '').trim().split(/\s+/).filter(Boolean);
+  phDrop(Infinity);
+  const old = words.filter(w => !w.dead);
+  const lh = parseFloat(getComputedStyle(lText).lineHeight) || 24, SL = Math.round(lh * .55);
+  // 1. where every old word and letter is on screen right now
+  const O = old.map(w => {
+    const el = w.el, cs = getComputedStyle(el), m = cs.transform && cs.transform !== 'none' ? new DOMMatrixReadOnly(cs.transform) : null;
+    const r = el.getBoundingClientRect(), s = el.offsetWidth ? r.width / el.offsetWidth : 1, cx = [];
+    const tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let nd;
+    while ((nd = tw.nextNode())) for (let i = 0; i < nd.length; i++) {
+      const rg = document.createRange(); rg.setStart(nd, i); rg.setEnd(nd, i + 1);
+      cx.push((rg.getBoundingClientRect().left - r.left) / s);
+    }
+    return { w, t: w.t, x: el.offsetLeft + (m ? m.m41 : 0), y: el.offsetTop + (m ? m.m42 : 0), ly: el.offsetTop, op: +cs.opacity, cx };
+  });
+  // 2. which old word became which new one (same or similar spelling)
+  const na = O.map(o => normW(o.t)), nb = nw.map(normW);
+  const pairs = alignNW(na.length, nb.length, (i, j) => na[i] === nb[j] ? 0 : (na[i] && nb[j] && 1 - lev(na[i], nb[j]) / Math.max(na[i].length, nb[j].length) > .5 ? .6 : Infinity));
+  const from = new Array(nw.length).fill(-1), gone = [];
+  for (const [i, j] of pairs) { if (i >= 0 && j >= 0) from[j] = i; else if (i >= 0) gone.push(i); }
+  // 3. the new text, laid out
+  for (const w of old) { w.el.getAnimations().forEach(a => a.cancel()); w.el.remove(); }
+  const ghost = (t, x, y, op) => {
+    const g = document.createElement('span'); g.className = 'w ghost'; g.textContent = t;
+    g.style.left = x + 'px'; g.style.top = y + 'px'; g.style.opacity = op; lText.append(g); return g;
+  };
+  const N = nw.map((t, j) => {
+    const el = document.createElement('span'); el.className = 'w';
+    const o = from[j] >= 0 ? O[from[j]] : null, same = o && o.t === t;
+    if (same) el.textContent = t;
+    else for (const ch of t.split('')) { const c = document.createElement('span'); c.className = 'c'; c.textContent = ch; el.append(c); }
+    if (phs.length) lText.insertBefore(el, phs[0].el); else lText.append(el);
+    return { el, t, o, same };
+  });
+  words = N.map(n => ({ el: n.el, t: n.t }));
+  const W = lText.clientWidth || 1, SW = 380, MOVE = 560;
+  const at = x => Math.max(0, Math.min(1, x / W)) * SW; // the wave reaches x at this moment
+  const blurIn = (el, dl, d = 380) => el.animate([{ opacity: 0, filter: 'blur(4px)', transform: 'translateY(.12em)' }, { opacity: 1, filter: 'blur(0px)', transform: 'none' }], { duration: d / k, delay: dl / k, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'backwards' });
+  const blurOut = (g, dl, d = 260) => g.animate([{ filter: 'blur(0px)', transform: 'none' }, { opacity: 0, filter: 'blur(4px)', transform: 'translateY(-.1em) scale(.97)' }], { duration: d / k, delay: dl / k, easing: 'cubic-bezier(.4,0,.6,1)', fill: 'both' }).finished.then(() => g.remove(), () => g.remove());
+  const slide = (el, dx, dy, dl) => (Math.abs(dx) > .5 || Math.abs(dy) > .5) && el.animate([{ transform: `translate(${dx}px,${dy}px)` }, { transform: 'none' }], { duration: MOVE / k, delay: dl / k, easing: 'cubic-bezier(.3,.9,.25,1)', fill: 'backwards' });
+  const col = fixColor(); if (col) lText.style.setProperty('--c-fix', col);
+  const tint = (el, dl) => col && el.animate([{ color: 'var(--c-tx)' }, { color: 'var(--c-fix)', offset: .12 }, { color: 'var(--c-fix)', offset: .4 }, { color: 'var(--c-tx)' }], { duration: 1800 / k, delay: dl / k, easing: 'ease-out' });
+  // removed words: dissolve where they were
+  for (const i of gone) { const o = O[i]; blurOut(ghost(o.t, o.x, o.y, o.op), 0, 220); }
+  let prev = null;
+  for (const n of N) {
+    const nx = n.el.offsetLeft, ny = n.el.offsetTop, o = n.o, dl = at(nx);
+    if (!o) { blurIn(n.el, dl); tint(n.el, dl); prev = { ny, ox: 0, oy: 0 }; continue; }
+    const sameLine = Math.abs(o.ly - ny) < lh / 2;
+    if (!sameLine) { // lands on another line: dissolves there, appears here riding along with the word before it
+      const pr = prev && Math.abs(prev.ny - ny) < lh / 2 ? prev : null, ox = (pr ? pr.ox : 0) + (ny < o.ly ? SL : 0), oy = pr ? pr.oy : 0;
+      blurOut(ghost(o.t, o.x, o.y, o.op), 0, 200);
+      blurIn(n.el, dl + 90, 340); slide(n.el, ox, oy, dl); if (!n.same) tint(n.el, dl);
+      prev = { ny, ox, oy }; continue;
+    }
+    const dx = o.x - nx, dy = o.y - ny;
+    if (n.same) {
+      slide(n.el, dx, dy, 0);
+      if (o.op < .99) n.el.animate([{ opacity: o.op }, { opacity: 1 }], { duration: 300 / k, delay: dl / k, fill: 'backwards' });
+      prev = { ny, ox: dx, oy: dy }; continue;
+    }
+    // changed word: letter by letter. The whole word glides to its new place; on the way, when the wave reaches it,
+    // the changed letters cross-fade (old one riding along), removed ones melt, new ones come out of the blur
+    const a = o.t.split(''), b = n.t.split(''), lo = s => s.toLowerCase().replace(/ё/g, 'е');
+    const cp = alignNW(a.length, b.length, (i, j) => lo(a[i]) === lo(b[j]) ? 0 : 1.2);
+    const cs = [...n.el.children], ride = (g, tx) => g.animate([{ transform: 'none' }, { transform: `translate(${tx}px,${-dy}px)` }], { duration: MOVE / k, easing: 'cubic-bezier(.3,.9,.25,1)', fill: 'both' });
+    const melt = (g, d) => g.animate([{ filter: 'blur(0px)' }, { opacity: 0, filter: 'blur(3px)' }], { duration: d / k, delay: dl / k, easing: 'cubic-bezier(.4,0,.6,1)', fill: 'both' }).finished.then(() => g.remove(), () => g.remove());
+    let lastTx = -dx;
+    for (const [i, j] of cp) {
+      const ox = i >= 0 ? o.x + (o.cx[i] || 0) : 0;
+      if (j < 0) { const g = ghost(a[i], ox, o.y, o.op); ride(g, lastTx); melt(g, 220); continue; }
+      const c = cs[j], cx = nx + c.offsetLeft;
+      if (i >= 0) { lastTx = cx - ox; slide(c, ox - cx, o.y - ny, 0); }
+      else slide(c, -dx, -dy, 0);
+      if (i >= 0 && a[i] === b[j]) { if (o.op < .99) c.animate([{ opacity: o.op }, { opacity: 1 }], { duration: 300 / k, delay: dl / k, fill: 'backwards' }); }
+      else {
+        if (i >= 0) { const g = ghost(a[i], ox, o.y, o.op); ride(g, cx - ox); melt(g, 260); }
+        c.animate([{ opacity: 0, filter: 'blur(3px)' }, { opacity: 1, filter: 'blur(0px)' }], { duration: 320 / k, delay: (dl + 30) / k, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'backwards' });
+      }
+    }
+    tint(n.el, dl);
+    prev = { ny, ox: dx, oy: dy };
+  }
+  // a faint light passes over the text with the wave
+  const sw = document.createElement('div'); sw.className = 'fixsweep' + (LIGHT ? ' on-light' : ''); lText.append(sw);
+  sw.animate([{ transform: `translateX(${-.45 * W}px)`, opacity: 0 }, { opacity: 1, offset: .25 }, { opacity: 1, offset: .7 }, { transform: `translateX(${W}px)`, opacity: 0 }], { duration: (SW + 420) / k, easing: 'cubic-bezier(.4,0,.4,1)', fill: 'both' }).finished.then(() => sw.remove(), () => sw.remove());
+  updCount();
+  if (panelOpen) { updatePanel(); autoScroll = performance.now() + 700; lBody.scrollTo({ top: lBody.scrollHeight, behavior: 'smooth' }); }
+  // afterwards the letters become plain text again
+  const list = words;
+  return sleep((SW + MOVE + 200) / k).then(() => { if (words !== list) return; for (const w of list) if (w.el.querySelector('.c') && !w.el.getAnimations({ subtree: true }).some(a => a.playState === 'running' && !a.effect.getKeyframes().some(f => f.color))) w.el.textContent = w.t; });
+}
+// live text from the local model: the last couple of words are still being decided, so they are a little paler
+function voskText(txt, last) {
+  setLiveText(txt);
+  const al = words.filter(w => !w.dead);
+  al.forEach((w, i) => w.el.classList.toggle('tent', !last && i >= al.length - 2));
+}
+
 /* ---------------- recording */
 const MIME = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/webm'].find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || '';
 const MAXREC = 10 * 60 * 1000;
@@ -211,7 +337,7 @@ function stripHall(t) {
 // the microphone opens on the very first key press and records at once (so the first word is never cut)
 function micOpen() {
   if (warm && !warm.dead) return warm;
-  const w = { chunks: [], peak: 0, vox: 0, dead: false };
+  const w = { chunks: [], peak: 0, vox: 0, dead: false, wantTap: !!(ENV.local && ENV.local.on()) };
   w.p = (async () => {
     const dev = S.mic;
     let stream;
@@ -223,6 +349,7 @@ function micOpen() {
       actx = actx || new AudioContext(); if (actx.state === 'suspended') actx.resume();
       w.src = actx.createMediaStreamSource(stream); w.an = actx.createAnalyser(); w.an.fftSize = 1024; w.src.connect(w.an); w.buf = new Float32Array(1024);
     } catch (e) { RA.log('analyser: ' + e.message); }
+    if (w.wantTap && w.src) RA.pcmTap(actx, w.src, pcm => { if (w.onpcm && !w.dead) w.onpcm(pcm); }).then(n => { w.tap = n; if (w.dead) n.disconnect(); }, e => RA.log('tap: ' + e.message));
     w.mr = new MediaRecorder(stream, MIME ? { mimeType: MIME, audioBitsPerSecond: 32000 } : {});
     w.mr.ondataavailable = e => { if (e.data && e.data.size) w.chunks.push(e.data); };
     w.mr.start(250);
@@ -239,6 +366,7 @@ function micClose(w) {
   try { if (w.mr && w.mr.state !== 'inactive') { w.mr.ondataavailable = null; w.mr.onstop = null; w.mr.stop(); } } catch (e) {}
   if (w.stream) w.stream.getTracks().forEach(t => t.stop());
   try { w.src && w.src.disconnect(); } catch (e) {}
+  try { w.tap && w.tap.disconnect(); } catch (e) {}
   if (warm === w) warm = null;
 }
 async function micStop(w) {
@@ -286,6 +414,11 @@ function startRec(o = {}) {
     r.w = micOpen();
     r.w.p.catch(e => { if (rec === r && e.message !== 'closed') { RA.log('mic: ' + (e.name || '') + ' ' + e.message); fail(micErr(e), 'mic'); } });
     if (ENV.onStart) ENV.onStart();
+    // the local model (when downloaded and on): words at once from the raw sound, no requests to Groq meanwhile
+    if (ENV.local && S.live !== 'off' && r.w.wantTap && ENV.local.on()) {
+      r.loc = ENV.local.start(t => { if (rec === r && state === 'rec' && t) voskText(t); });
+      r.w.onpcm = pcm => ENV.local.feed(r.loc, pcm);
+    }
     partialLoop(r);
     r.mx = setTimeout(() => { if (rec === r && state === 'rec') finish(); }, MAXREC);
   }
@@ -298,6 +431,7 @@ function startRec(o = {}) {
 const PGAP = 3300;
 function partialLoop(r, now) {
   clearTimeout(r.pt);
+  if (r.loc) return;
   const t = performance.now(), since = t - (r.lastP || -1e9), every = Math.max(PGAP, (t - r.t0) * .055);
   const gap = !panelOpen || r.busy ? 400 : Math.max(now ? 0 : every - since, 1000 - since, 0) + (r.back || 0);
   r.pt = setTimeout(async () => {
@@ -325,6 +459,7 @@ async function finish() {
     let blob = null, w = null;
     try { w = await r.w.p; } catch (e) { if (f === flow) fail(micErr(e), 'mic'); return; }
     if (f !== flow) { micClose(w); return; }
+    if (r.loc) { const id = r.loc; ENV.local.finish(id).then(t => { if (f === flow && state === 'proc' && finalF !== f && t) voskText(t, true); }, () => {}); }
     // a tap that was too short or silence: no request, no error — just back to rest
     if (dur < .5 || w.peak < .2) { micClose(w); sound('cancel'); setState('idle'); shake(); RA.log(`skipped: ${dur.toFixed(2)}s peak ${w.peak.toFixed(2)}`); return; }
     sound('stop');
@@ -349,19 +484,26 @@ async function recognize(f, blob, dur) {
   if (f !== flow) return;
   txt = stripHall(txt);
   if (!txt) { fail('Ничего не услышал'); return; }
-  setLiveText(txt);
-  await sleep(panelOpen ? 260 : 0);
+  finalF = f;
+  const live = panelOpen && words.some(w => !w.dead);
+  const pre = S.clean && S.smart && ENV.polish && live ? Promise.resolve().then(() => ENV.polish(txt)) : null;
+  if (pre) pre.catch(() => {});
+  if (live) { fixText(txt); await sleep(FIXHOLD / K()); }
+  else { setLiveText(txt); await sleep(panelOpen ? 260 : 0); }
   if (f !== flow) return;
-  return polishAndGo(f, true, dur);
+  return polishAndGo(f, true, dur, pre);
 }
-async function polishAndGo(f, real, dur = 0) {
+// how long the correction is shown before the text goes in (the letters are settled by then)
+const FIXHOLD = 680;
+let finalF = 0;
+async function polishAndGo(f, real, dur = 0, pre = null) {
   const k = K();
   if (S.clean) {
     if (real) {
       let done = false;
       if (ENV.polish) {
         const raw = words.filter(w => !w.dead).map(w => w.t).join(' ');
-        try { const c = await ENV.polish(raw); if (f !== flow) return; if (c) { planTo(c); done = true; } } catch (e) { RA.log('polish: ' + e.message); }
+        try { const c = await (pre || ENV.polish(raw)); if (f !== flow) return; if (c) { planTo(c); done = true; } } catch (e) { RA.log('polish: ' + e.message); }
       }
       if (!done) planLocal();
     }
@@ -513,7 +655,7 @@ function lvTick(fd) {
     if (r.real) {
       const raw = micLevel(r.w); tg = raw;
       if (r.w) { if (raw > r.w.peak) r.w.peak = raw; if (raw > .3) r.w.vox += dt; }
-      if (panelOpen && ENV.recognize && Math.min(1, raw * S.sens / 100) > .3) { r.phv = (r.phv || 0) + dt; if (r.phv >= .35) { r.phv -= .35; phAdd(); } }
+      if (panelOpen && ENV.recognize && !r.loc && Math.min(1, raw * S.sens / 100) > .3) { r.phv = (r.phv || 0) + dt; if (r.phv >= .35) { r.phv -= .35; phAdd(); } }
     }
     else tg = simLevel(r.loop ? ms % (r.sim.end + 600) : ms, r.sim);
     if (r.loop && ms % (r.sim.end + 600) < 30) r.sim.i = 0;
