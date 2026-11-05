@@ -88,7 +88,8 @@ fn set_hit(rects: Vec<[f64; 4]>) {
 #[tauri::command]
 async fn paste(text: String, method: String, keep: bool) -> Result<(), String> {
   tauri::async_runtime::spawn_blocking(move || {
-    if FOCUSED.swap(false, Ordering::SeqCst) {
+    // the overlay has the keyboard (editing, or a click on the panel took it): give it back first
+    if FOCUSED.swap(false, Ordering::SeqCst) || win::is_front(ovl()) {
       win::give_focus_back(ovl());
       std::thread::sleep(Duration::from_millis(90));
     }
@@ -123,6 +124,15 @@ fn focus_overlay(on: bool) {
   } else if FOCUSED.swap(false, Ordering::SeqCst) {
     win::give_focus_back(ovl());
   }
+}
+
+/// review is open: a click on the panel may take the keyboard (see win::click_focus)
+#[tauri::command]
+fn click_focus(on: bool) {
+  if !on && FOCUSED.load(Ordering::SeqCst) {
+    return; // editing: focus_overlay(false) or paste gives the keyboard back
+  }
+  win::click_focus(ovl(), on);
 }
 
 #[tauri::command]
@@ -223,6 +233,7 @@ fn overlay_loop(app: AppHandle) {
     let mut lock = false;
     let mut was_down = false;
     let mut fs = false;
+    let mut fs_info = String::new();
     let mut last_area = Instant::now();
     let mut last_top = Instant::now();
     let mut last_fs = Instant::now();
@@ -258,7 +269,14 @@ fn overlay_loop(app: AppHandle) {
       }
       if last_fs.elapsed() > Duration::from_millis(500) {
         last_fs = Instant::now();
-        let f = win::fullscreen_front();
+        let (f, info) = win::fullscreen_front();
+        if !info.is_empty() && info != fs_info {
+          // what the full-screen check sees, only when it changes (the hidden log, for finding out why)
+          if f || info.contains("caption false") || !info.contains("windows 5") {
+            logx::log(&info);
+          }
+          fs_info = info;
+        }
         if f != fs {
           fs = f;
           let _ = app.emit_to("capsule", "fs", json!({ "on": f }));
@@ -341,7 +359,7 @@ fn run_app(ctx: tauri::Context<tauri::Wry>, autostarted: bool) {
       show_main(app, None)
     }))
     .invoke_handler(tauri::generate_handler![
-      set_hotkey, set_keys, hk_record, set_paused, set_hit, paste, copy_text, fg_app, focus_overlay, show_settings, quit,
+      set_hotkey, set_keys, hk_record, set_paused, set_hit, paste, copy_text, fg_app, focus_overlay, click_focus, show_settings, quit,
       app_info, autostart, open_url, open_logs, log, win_ctl, upd_check, upd_install, asr::asr_status, asr::asr_get, asr::asr_cancel,
       asr::asr_del, asr::asr_warm, asr::asr_start, asr::asr_feed, asr::asr_finish
     ])

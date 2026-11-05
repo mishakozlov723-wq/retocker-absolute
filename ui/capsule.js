@@ -47,7 +47,12 @@
     },
     check: () => (RA.auth().vk ? '' : 'Нет ключа Groq'),
     onChange: S => syncHotkey(S),
-    onState: s => { if (s !== lastState) { lastState = s; log('state ' + s); } },
+    onState: s => {
+      if (s === lastState) return;
+      // the review window: a click on it may take the keyboard (Windows refuses to hand it over later)
+      if (s === 'review' || lastState === 'review') invoke('click_focus', { on: s === 'review' }).catch(() => {});
+      lastState = s; log('state ' + s);
+    },
     local,
     recognize: (blob, o) => window.VOICE.recognize(blob, o),
     polish: text => window.VOICE.polish(text),

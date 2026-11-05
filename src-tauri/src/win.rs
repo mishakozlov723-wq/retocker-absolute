@@ -12,7 +12,7 @@ use windows::Win32::System::Threading::{
   PROCESS_QUERY_LIMITED_INFORMATION,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
-use windows::Win32::UI::Shell::{DefSubclassProc, SetWindowSubclass, ShellExecuteW};
+use windows::Win32::UI::Shell::{DefSubclassProc, SHQueryUserNotificationState, SetWindowSubclass, ShellExecuteW};
 use windows::Win32::UI::WindowsAndMessaging::*;
 
 pub fn wide(s: &str) -> Vec<u16> {
@@ -110,12 +110,41 @@ pub fn own(h: HWND) -> bool {
 }
 
 /// is the window in front covering its whole monitor (a game, a video, a presentation)?
-pub fn fullscreen_front() -> bool {
+/// Two checks: our own look at the window, and Windows' (it knows when not to show notifications).
+/// The second string says what was seen — for the log, when it changes.
+pub fn fullscreen_front() -> (bool, String) {
   unsafe {
     let h = GetForegroundWindow();
     if h.0.is_null() || own(h) {
-      return false;
+      return (false, String::new());
     }
+    let q = SHQueryUserNotificationState().map(|v| v.0).unwrap_or(0);
+    // 2 busy (a fullscreen app), 3 a fullscreen game (Direct3D), 4 presentation mode
+    let win = (2..=4).contains(&q);
+    let mut cls = [0u16; 64];
+    let n = GetClassNameW(h, &mut cls);
+    let c = String::from_utf16_lossy(&cls[..n.max(0) as usize]);
+    let st = GetWindowLongW(h, GWL_STYLE) as u32;
+    let zoomed = IsZoomed(h).as_bool();
+    let mut r = RECT::default();
+    let _ = GetWindowRect(h, &mut r);
+    let m = MonitorFromWindow(h, MONITOR_DEFAULTTONEAREST);
+    let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
+    let _ = GetMonitorInfoW(m, &mut mi);
+    let s = mi.rcMonitor;
+    let mine = shape_fullscreen(h);
+    let info = format!(
+      "fs {} (shape {mine}, windows {q}) class {c} caption {} zoomed {zoomed} win {},{} {}x{} monitor {},{} {}x{}",
+      mine || win,
+      st & WS_CAPTION.0 == WS_CAPTION.0,
+      r.left, r.top, r.right - r.left, r.bottom - r.top, s.left, s.top, s.right - s.left, s.bottom - s.top
+    );
+    (mine || win, info)
+  }
+}
+
+fn shape_fullscreen(h: HWND) -> bool {
+  unsafe {
     let mut cls = [0u16; 64];
     let n = GetClassNameW(h, &mut cls);
     let c = String::from_utf16_lossy(&cls[..n.max(0) as usize]);
@@ -247,6 +276,33 @@ pub fn take_focus(h: HWND) {
     let _ = SetWindowSubclass(h, Some(no_activate), 0x5241, 1);
   }
   force_front(h);
+}
+
+/// review: a click on the panel itself gives the overlay the keyboard (Windows always allows a click),
+/// instead of asking for it after the click (Windows may refuse that). Off: never activated again,
+/// and if the overlay has the keyboard, it goes back to the window the user was writing in.
+pub fn click_focus(h: HWND, on: bool) {
+  unsafe {
+    let fg = GetForegroundWindow();
+    if on && !fg.0.is_null() && !own(fg) {
+      PREV.store(fg.0 as isize, Ordering::SeqCst);
+    }
+    let ex = GetWindowLongPtrW(h, GWL_EXSTYLE);
+    let n = if on { ex & !(WS_EX_NOACTIVATE.0 as isize) } else { ex | WS_EX_NOACTIVATE.0 as isize };
+    SetWindowLongPtrW(h, GWL_EXSTYLE, n);
+    let _ = SetWindowSubclass(h, Some(no_activate), 0x5241, on as usize);
+    if !on && fg == h {
+      let p = PREV.load(Ordering::SeqCst);
+      let ph = hwnd_of(p);
+      if p != 0 && IsWindow(Some(ph)).as_bool() {
+        let _ = SetForegroundWindow(ph);
+      }
+    }
+  }
+}
+
+pub fn is_front(h: HWND) -> bool {
+  unsafe { GetForegroundWindow() == h }
 }
 
 /// give the keyboard back to the window the user was writing in
