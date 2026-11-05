@@ -233,7 +233,6 @@ fn overlay_loop(app: AppHandle) {
     let mut lock = false;
     let mut was_down = false;
     let mut fs = false;
-    let mut fs_info = String::new();
     let mut last_area = Instant::now();
     let mut last_top = Instant::now();
     let mut last_fs = Instant::now();
@@ -270,14 +269,8 @@ fn overlay_loop(app: AppHandle) {
       if last_fs.elapsed() > Duration::from_millis(500) {
         last_fs = Instant::now();
         let (f, info) = win::fullscreen_front();
-        if !info.is_empty() && info != fs_info {
-          // what the full-screen check sees, only when it changes (the hidden log, for finding out why)
-          if f || info.contains("caption false") || !info.contains("windows 5") {
-            logx::log(&info);
-          }
-          fs_info = info;
-        }
         if f != fs {
+          logx::log(if info.is_empty() { "fullscreen false" } else { &info }); // the hidden log: what was seen
           fs = f;
           let _ = app.emit_to("capsule", "fs", json!({ "on": f }));
         }

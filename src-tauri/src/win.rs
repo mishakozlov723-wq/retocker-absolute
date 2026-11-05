@@ -12,7 +12,7 @@ use windows::Win32::System::Threading::{
   PROCESS_QUERY_LIMITED_INFORMATION,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
-use windows::Win32::UI::Shell::{DefSubclassProc, SHQueryUserNotificationState, SetWindowSubclass, ShellExecuteW};
+use windows::Win32::UI::Shell::{DefSubclassProc, SetWindowSubclass, ShellExecuteW};
 use windows::Win32::UI::WindowsAndMessaging::*;
 
 pub fn wide(s: &str) -> Vec<u16> {
@@ -109,68 +109,44 @@ pub fn own(h: HWND) -> bool {
   !h.0.is_null() && pid_of(h) == unsafe { GetCurrentProcessId() }
 }
 
-/// is the window in front covering its whole monitor (a game, a video, a presentation)?
-/// Two checks: our own look at the window, and Windows' (it knows when not to show notifications).
-/// The second string says what was seen — for the log, when it changes.
+/// is the window in front covering its whole monitor (a game, a video, F11 in a browser)?
+/// The second string says what was seen — for the log.
+/// (Windows' own answer, SHQueryUserNotificationState, said «busy» almost all the time — not used.)
 pub fn fullscreen_front() -> (bool, String) {
   unsafe {
     let h = GetForegroundWindow();
     if h.0.is_null() || own(h) {
       return (false, String::new());
     }
-    let q = SHQueryUserNotificationState().map(|v| v.0).unwrap_or(0);
-    // 2 busy (a fullscreen app), 3 a fullscreen game (Direct3D), 4 presentation mode
-    let win = (2..=4).contains(&q);
     let mut cls = [0u16; 64];
     let n = GetClassNameW(h, &mut cls);
     let c = String::from_utf16_lossy(&cls[..n.max(0) as usize]);
+    // the desktop, the taskbars, Alt+Tab / task view and the Start menu cover the screen too — they are not fullscreen apps
+    const SHELL: [&str; 9] = [
+      "Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd", "XamlExplorerHostIslandWindow", "ForegroundStaging",
+      "Windows.UI.Core.CoreWindow", "MultitaskingViewFrame", "TaskSwitcherWnd",
+    ];
+    if SHELL.contains(&c.as_str()) {
+      return (false, String::new());
+    }
+    // a maximized window has a title bar and reaches past the screen edges (-8 px);
+    // real fullscreen has no title bar and is exactly the monitor. Browsers stay «maximized» in F11 — that's fine.
     let st = GetWindowLongW(h, GWL_STYLE) as u32;
-    let zoomed = IsZoomed(h).as_bool();
+    let cap = st & WS_CAPTION.0 == WS_CAPTION.0;
     let mut r = RECT::default();
     let _ = GetWindowRect(h, &mut r);
     let m = MonitorFromWindow(h, MONITOR_DEFAULTTONEAREST);
     let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
-    let _ = GetMonitorInfoW(m, &mut mi);
-    let s = mi.rcMonitor;
-    let mine = shape_fullscreen(h);
-    let info = format!(
-      "fs {} (shape {mine}, windows {q}) class {c} caption {} zoomed {zoomed} win {},{} {}x{} monitor {},{} {}x{}",
-      mine || win,
-      st & WS_CAPTION.0 == WS_CAPTION.0,
-      r.left, r.top, r.right - r.left, r.bottom - r.top, s.left, s.top, s.right - s.left, s.bottom - s.top
-    );
-    (mine || win, info)
-  }
-}
-
-fn shape_fullscreen(h: HWND) -> bool {
-  unsafe {
-    let mut cls = [0u16; 64];
-    let n = GetClassNameW(h, &mut cls);
-    let c = String::from_utf16_lossy(&cls[..n.max(0) as usize]);
-    if c == "Progman" || c == "WorkerW" || c == "Shell_TrayWnd" {
-      return false;
-    }
-    // a maximized window (with an auto-hiding taskbar it covers the whole screen) is not fullscreen;
-    // real fullscreen (games, video, F11 in a browser) has no title bar and is not "maximized"
-    if IsZoomed(h).as_bool() {
-      return false;
-    }
-    let st = GetWindowLongW(h, GWL_STYLE) as u32;
-    if st & WS_CAPTION.0 == WS_CAPTION.0 {
-      return false;
-    }
-    let mut r = RECT::default();
-    if GetWindowRect(h, &mut r).is_err() {
-      return false;
-    }
-    let m = MonitorFromWindow(h, MONITOR_DEFAULTTONEAREST);
-    let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
     if !GetMonitorInfoW(m, &mut mi).as_bool() {
-      return false;
+      return (false, String::new());
     }
     let s = mi.rcMonitor;
-    r.left <= s.left && r.top <= s.top && r.right >= s.right && r.bottom >= s.bottom
+    let f = !cap && r.left <= s.left && r.top <= s.top && r.right >= s.right && r.bottom >= s.bottom;
+    let info = format!(
+      "fullscreen {f}: class {c} caption {cap} zoomed {} win {},{} {}x{} monitor {},{} {}x{}",
+      IsZoomed(h).as_bool(), r.left, r.top, r.right - r.left, r.bottom - r.top, s.left, s.top, s.right - s.left, s.bottom - s.top
+    );
+    (f, info)
   }
 }
 
