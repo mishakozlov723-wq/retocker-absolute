@@ -401,6 +401,7 @@ function buildText() {
   sw('clean', 'Причесать текст', 'Убрать «эээ», «ну», поставить заглавные буквы', { tip: 'clean' });
   sw('smart', 'Умная причёска', 'Groq поправит запятые, оговорки и числа — по смыслу', { tip: 'smart', dis: () => !S_().clean });
   sw('review', 'Проверить перед вставкой', 'Сначала окно с текстом: поправил — Enter', { tip: 'review' });
+  sw('revBtn', 'Кнопка «Проверю перед вставкой»', 'В панели с текстом во время речи: нажал — после диктовки откроется окно проверки, только в этот раз', { dis: () => S_().review || S_().live === 'off' });
 
   sec('Вставка');
   seg('paste', 'Как вставлять', [['clip', 'Через буфер'], ['type', 'Печатать']], 'Печатать — для программ, где не работает Ctrl+V', { tip: 'paste' });
@@ -731,6 +732,9 @@ function streak(days) {
   return n;
 }
 function dur(min) { if (min < 1) return 'меньше минуты'; if (min < 60) return Math.round(min) + ' мин'; const hh = Math.floor(min / 60), mm = Math.round(min % 60); return hh + ' ч' + (mm ? ' ' + mm + ' мин' : ''); }
+// profiles: the page lives in prof.js
+const { buildProf, paintProf, profNav } = window.PROFUI({ RA, $, h, page, head, sec, row, dd, toast, push, refresh, SHOW, cap: () => cap, cur: () => cur });
+
 function buildHome() { page('home'); P.append(h('div', '', '')); SHOW.home = refreshHome; }
 function refreshHome() {
   const el = $('#p-home'); if (!el || !cap) return;
@@ -768,7 +772,7 @@ function refreshHome() {
 
 /* ---------------- start */
 function init() {
-  buildPreviewBar(); buildHome(); buildCaps(); buildText(); buildCtl(); buildKey(); buildAbout();
+  buildPreviewBar(); buildHome(); buildCaps(); buildText(); buildCtl(); buildProf(); buildKey(); buildAbout(); profNav();
   if (window.TIPS) window.TIPS.init();
   refresh(); keyState();
   listen('page', e => go(String(e.payload || 'home')));
@@ -779,6 +783,7 @@ function init() {
     if (e.key === RA.KEY) { cap.reload(); refresh(); if (cur === 'home') refreshHome(); }
     if (e.key === RA.STATS && cur === 'home') refreshHome();
     if (e.key === RA.AUTH) keyState();
+    if (e.key === RA.PROF) paintProf();
   });
   addEventListener('blur', () => { if (hkRec) hkStop(); });
   invoke('app_info').then(a => {
