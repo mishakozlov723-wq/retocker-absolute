@@ -19,17 +19,11 @@
         mc.innerHTML = html != null ? html : st === 'rec' ? BARS : st === 'proc' ? '<span style="letter-spacing:2px">•••</span>' : st === 'done' ? '✓ готово' : '';
         mc.style.width = st === 'done' ? '62px' : st === 'proc' ? '46px' : st === 'hint' ? '96px' : '';
       },
+      dotBig(on) { mc.classList.toggle('big', on); },
       capHide(on) { mc.style.opacity = on ? '0' : ''; },
       capAt(x, y) { if (x == null) { mc.style.left = ''; mc.style.top = ''; mc.style.bottom = ''; return; } mc.style.left = x + 'px'; mc.style.top = y + 'px'; mc.style.bottom = 'auto'; },
       panel(on, html, o = {}) {
         if (html != null) mp.innerHTML = html;
-        if (o.dot) { // starts as the dot of the capsule
-          mp.style.transition = 'none'; mp.style.width = '6px'; mp.style.height = '6px'; mp.style.left = (W / 2 - 26) + 'px'; mp.style.bottom = '19px'; mp.style.borderRadius = '50%'; mp.style.background = '#fff'; mp.style.padding = '0'; mp.style.opacity = '1'; mp.style.transform = 'none';
-          mp.offsetWidth; mp.style.transition = '';
-          mp.style.width = '150px'; mp.style.height = '44px'; mp.style.left = (W / 2 - 75) + 'px'; mp.style.bottom = '40px'; mp.style.borderRadius = '9px'; mp.style.background = ''; mp.style.padding = '';
-          return;
-        }
-        if (o.toDot) { mp.style.width = '6px'; mp.style.height = '6px'; mp.style.left = (W / 2 - 26) + 'px'; mp.style.bottom = '19px'; mp.style.borderRadius = '50%'; mp.style.background = '#fff'; mp.style.padding = '0'; mp.innerHTML = ''; setTimeout(() => { mp.style.opacity = '0'; }, 380); return; }
         ['width', 'height', 'left', 'bottom', 'borderRadius', 'background', 'padding', 'opacity', 'transform'].forEach(k => { mp.style[k] = ''; });
         mp.classList.toggle('on', on);
       },
@@ -74,9 +68,9 @@
     live: { t: () => 'Пока говоришь, над капсулой виден текст. <b>По клику</b> — нажми на точку в капсуле.', s: [
       [300, s => s.cap('rec')], [300, s => s.cur(dotX + 4, capY - 2)], [700, s => s.click()], [150, s => { s.panel(true, ''); s.words(['Смотри,', 'сегодня', 'биткоин', 'пробил', 'сопротивление…']); }],
       [2200, s => s.cap('done')], [200, s => s.panel(false)], [1000, s => s.cap('idle')], [900, s => s.cur(270, 150)], [600, () => {}]] },
-    pdot: { t: () => 'Точка в капсуле <b>сама вырастает в панель</b> с текстом — и так же сжимается обратно.', s: [
-      [300, s => s.cap('rec')], [300, s => s.cur(dotX + 4, capY - 2)], [700, s => s.click()], [120, s => s.panel(true, '', { dot: true })], [420, s => s.words(['Смотри,', 'сегодня', 'биткоин', 'пробил…'], { step: 150 })],
-      [1900, s => s.click()], [100, s => s.panel(false, null, { toDot: true })], [1300, s => s.cur(270, 150)], [500, s => s.cap('idle')], [700, () => {}]] },
+    pdot: { t: () => 'Нажал на точку — текст открылся, а <b>точка плавно стала больше</b>. Закрыл — уменьшилась обратно.', s: [
+      [300, s => s.cap('rec')], [300, s => s.cur(dotX + 4, capY - 2)], [700, s => s.click()], [120, s => { s.panel(true, ''); s.dotBig(true); s.words(['Смотри,', 'сегодня', 'биткоин', 'пробил…'], { step: 150 }); }],
+      [2100, s => s.click()], [120, s => { s.panel(false); s.dotBig(false); }], [1300, s => s.cur(270, 150)], [500, s => s.cap('idle')], [700, () => {}]] },
     clean: { t: () => 'Убирает «эээ», «ну» и лишние повторы, ставит заглавные буквы.', s: [
       [300, s => { s.panel(true, ''); s.cap('proc'); s.words(['ну', 'эээ', 'смотри,', 'завтра', 'лонг'], { step: 110 }); }], [1100, s => s.strike([0, 1])], [700, s => { s.vanish([0, 1]); s.swap(2, 'Смотри,'); }],
       [1300, s => { s.panel(false); s.cap('done'); s.docText('Смотри, завтра лонг'); }], [1300, s => s.cap('idle')], [900, () => {}]] },

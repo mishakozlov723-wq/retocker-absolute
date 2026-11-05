@@ -275,7 +275,29 @@ pub fn open_url(url: &str) {
 }
 
 const RUN: PCWSTR = w!("Software\\Microsoft\\Windows\\CurrentVersion\\Run");
-const NAME: PCWSTR = w!("Retocker Absolute");
+const NAME: PCWSTR = w!("Retocker Voice");
+// the name the app had before (up to 1.0.14)
+const OLD_NAME: PCWSTR = w!("Retocker Absolute");
+
+/// The app used to be called Retocker Absolute: if autostart was on under the old name, it moves over to the new
+/// name and points at this exe (the old entry would start the old program, or nothing once it is removed).
+pub fn autostart_migrate() {
+  let had = unsafe {
+    let mut n = 0u32;
+    RegGetValueW(HKEY_CURRENT_USER, RUN, OLD_NAME, RRF_RT_REG_SZ, None, None, Some(&mut n)).is_ok()
+  };
+  if !had {
+    return;
+  }
+  unsafe {
+    let mut k = HKEY::default();
+    if RegCreateKeyExW(HKEY_CURRENT_USER, RUN, None, PCWSTR::null(), REG_OPTION_NON_VOLATILE, KEY_SET_VALUE, None, &mut k, None).is_ok() {
+      let _ = RegDeleteValueW(k, OLD_NAME);
+      let _ = RegCloseKey(k);
+    }
+  }
+  autostart_set(true);
+}
 
 pub fn autostart_get() -> bool {
   unsafe {
