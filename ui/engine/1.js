@@ -129,12 +129,13 @@ const dpr = () => window.devicePixelRatio || 1;
 const snap = v => Math.round(v * dpr()) / dpr();
 
 /* ---------------- apply settings */
-let BW = 1, WAVE = '#fff', glowAmt = .25, ACC = '#fff';
+let BW = 1, WAVE = '#fff', glowAmt = .25, ACC = '#fff', LIGHT = false;
 function apply(o = {}) {
   const V = (n, v) => root.style.setProperty(n, v);
   const glass = S.bg === 'glass';
   const bgHex = S.bg === 'custom' ? S.bgc : (BGS.find(b => b[0] === S.bg) || BGS[0])[1] || '#1e1e1e';
   const light = !glass && lum(bgHex) > .4;
+  LIGHT = light;
   const T = light ? '0,0,0' : '255,255,255';
   V('--c-bg', glass ? '#2c2c2e' : bgHex); V('--c-bgs', glass ? '#1e1e1e' : bgHex);
   V('--c-tx', `rgba(${T},${light ? .86 : .93})`); V('--c-tx2', `rgba(${T},.52)`);
