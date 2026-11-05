@@ -28,8 +28,7 @@
         "installMode": "currentUser",
         "languages": ["Russian"],
         "displayLanguageSelector": false,
-        "startMenuFolder": "Retocker",
-        "installerHooks": "./installer-hooks.nsh"
+        "startMenuFolder": "Retocker"
       }
     }
   }

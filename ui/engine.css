@@ -88,12 +88,18 @@
 .pc[data-mode=proc] .ldot,.pc[data-mode=review] .ldot{opacity:.6}
 .pc .grow{flex:1}
 .lcnt{font-variant-numeric:tabular-nums;color:var(--c-tx2);font-weight:600}
-.lb{max-height:210px;overflow:auto;padding:0 18px 14px;scrollbar-width:thin;scrollbar-color:var(--c-btn) transparent;-webkit-mask-image:linear-gradient(transparent 0,#000 10px);mask-image:linear-gradient(transparent 0,#000 10px)}
+/* the text scrolls without a scrollbar; soft edges show there is more above / below (set from JS) */
+@property --ft{syntax:'<length>';inherits:false;initial-value:0px}
+@property --fb{syntax:'<length>';inherits:false;initial-value:0px}
+.lb{max-height:210px;overflow:auto;padding:0 18px 14px;scrollbar-width:none;--ft:0px;--fb:0px;-webkit-mask-image:linear-gradient(transparent 0,#000 var(--ft),#000 calc(100% - var(--fb)),transparent 100%);mask-image:linear-gradient(transparent 0,#000 var(--ft),#000 calc(100% - var(--fb)),transparent 100%);transition:--ft .22s ease,--fb .22s ease}
+.lb::-webkit-scrollbar{display:none}
+.lb.ft{--ft:18px}
+.lb.fb{--fb:18px}
 .lt{position:relative;font-size:var(--fs);line-height:1.6;color:var(--c-tx);white-space:normal;overflow-wrap:break-word;outline:none;min-height:1.6em;user-select:text;-webkit-user-select:text}
 .lt:empty::before{content:'Говори — текст появится здесь';color:var(--c-tx2);opacity:.7}
 .pc[data-mode=review] .lt{white-space:pre-wrap;cursor:text;border-radius:6px;box-shadow:0 0 0 1px var(--c-ln);padding:8px 10px;margin:0 -10px;background:color-mix(in srgb,var(--c-tx) 3%,transparent);transition:box-shadow .15s}
 .pc[data-mode=review] .lt:focus{box-shadow:0 0 0 1.5px color-mix(in srgb,var(--c-tx) 35%,transparent)}
-.pc[data-mode=review] .lb{-webkit-mask-image:none;mask-image:none;padding-top:2px}
+.pc[data-mode=review] .lb{padding-top:2px}
 .lf{display:none;align-items:center;gap:6px;padding:2px 10px 10px 18px}
 .pc[data-mode=review] .lf{display:flex}
 .lk{font-size:11.5px;color:var(--c-tx2)}
