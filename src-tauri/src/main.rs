@@ -208,7 +208,7 @@ fn overlay_loop(app: AppHandle) {
         lock = false;
       }
       was_down = down;
-      let want = inside || lock || FOCUSED.load(Ordering::SeqCst);
+      let want = inside || lock;
       if want != interactive {
         interactive = want;
         win::set_clickthrough(h, !want);
@@ -345,7 +345,7 @@ fn main() {
         hook::Ev::Rec { name, down, m } => {
           let _ = hh.emit_to("main", "rec", json!({ "name": name, "down": down, "m": m }));
         }
-        hook::Ev::Mask => {}
+        _ => {}
       });
       hook::set_hotkey("Ctrl+Win", true);
       overlay_loop(h.clone());

@@ -2,6 +2,7 @@
 //! It knows the dictation hotkey (any combo, also modifiers only, e.g. Ctrl+Win), swallows the main key of a
 //! combo so the app under the cursor never sees it, catches Esc / Enter while the capsule waits for them, and
 //! can record a new hotkey for the settings window (then every key goes only to us, so Win never opens Start).
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -34,6 +35,16 @@ pub enum Ev {
   Rec { name: String, down: bool, m: bool },
   /// send the menu mask key (keeps Start / the menu bar from opening after Win / Alt combos)
   Mask,
+  /// a line for the log (only with RA_DEBUG=1)
+  Dbg(String),
+}
+
+/// RA_DEBUG=1: every key the hook sees goes to the log (vk, flags, held modifiers, decision)
+static DEBUG: AtomicBool = AtomicBool::new(false);
+fn dbg(f: impl FnOnce() -> String) {
+  if DEBUG.load(Ordering::Relaxed) {
+    send(Ev::Dbg(f()));
+  }
 }
 
 #[derive(Default)]
@@ -53,6 +64,8 @@ struct St {
   enter: bool,
   rec_until: Option<Instant>,
   paused: bool,
+  // GetAsyncKeyState has reported a held modifier at least once, so its "not held" can be trusted
+  async_ok: bool,
 }
 
 static ST: OnceLock<Mutex<St>> = OnceLock::new();
@@ -224,6 +237,18 @@ unsafe extern "system" fn proc_(code: i32, wp: WPARAM, lp: LPARAM) -> LRESULT {
 /// true = swallow the event
 fn handle(msg: u32, kb: &KBDLLHOOKSTRUCT) -> bool {
   let down = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
+  let r = handle_(down, kb);
+  dbg(|| {
+    let s = st();
+    format!(
+      "key vk={:02X} sc={:X} fl={:X} {} -> held={:08b} cand={} other={} active={} swallow={}",
+      kb.vkCode, kb.scanCode, kb.flags.0, if down { "down" } else { "up" }, s.held, s.cand, s.other, s.active, r
+    )
+  });
+  r
+}
+
+fn handle_(down: bool, kb: &KBDLLHOOKSTRUCT) -> bool {
   let vk = kb.vkCode;
   let bit = mod_bit(vk, kb.scanCode | if kb.flags.0 & LLKHF_EXTENDED.0 != 0 { 0x200 } else { 0 });
   let mut s = st();
@@ -344,30 +369,41 @@ fn handle(msg: u32, kb: &KBDLLHOOKSTRUCT) -> bool {
   false
 }
 
-/// the hook can miss releases (e.g. after Ctrl+Alt+Del or UAC): trust the system for every other modifier
+/// The hook can miss releases (e.g. after Ctrl+Alt+Del, UAC or Win+L), so a modifier could look held forever.
+/// The system state fixes that: a modifier the system says is up is dropped. That is only trusted once the
+/// system has shown it really sees the keys (on some desktops GetAsyncKeyState always says "up").
 fn sync_held(s: &mut St, cur: u8) {
-  let mut h = 0u8;
+  let mut sys = 0u8;
   for (vk, b) in [(0xA2, LCTRL), (0xA3, RCTRL), (0xA4, LALT), (0xA5, RALT), (0xA0, LSHIFT), (0xA1, RSHIFT), (0x5B, LWIN), (0x5C, RWIN)] {
-    if b == cur {
-      h |= s.held & b;
-    } else if unsafe { GetAsyncKeyState(vk) } as u16 & 0x8000 != 0 {
-      h |= b;
+    if b != cur && unsafe { GetAsyncKeyState(vk) } as u16 & 0x8000 != 0 {
+      sys |= b;
     }
   }
-  s.held = h;
+  if sys & s.held & !cur != 0 {
+    s.async_ok = true;
+  }
+  if s.async_ok {
+    s.held = (s.held & cur) | sys;
+  }
 }
 
 /// Starts the hook thread; `on_ev` runs on a separate dispatcher thread (never inside the hook).
 pub fn start(on_ev: impl Fn(Ev) + Send + 'static) {
+  DEBUG.store(std::env::var("RA_DEBUG").map(|v| v == "1").unwrap_or(false), Ordering::Relaxed);
   let (tx, rx) = channel::<Ev>();
   let _ = TX.set(Mutex::new(tx));
   std::thread::spawn(move || {
     while let Ok(e) = rx.recv() {
-      if let Ev::Mask = e {
-        crate::paste::tap_mask();
-        continue;
+      match e {
+        Ev::Mask => crate::paste::tap_mask(),
+        Ev::Dbg(m) => crate::logx::log(&m),
+        e => {
+          if DEBUG.load(Ordering::Relaxed) {
+            crate::logx::log(&format!("hook event {e:?}"));
+          }
+          on_ev(e)
+        }
       }
-      on_ev(e);
     }
   });
   std::thread::spawn(|| unsafe {
