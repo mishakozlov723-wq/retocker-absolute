@@ -43,7 +43,7 @@ pub struct Manifest {
 static MAN: Mutex<Option<Manifest>> = Mutex::new(None);
 static BUSY: Mutex<bool> = Mutex::new(false);
 
-fn agent() -> ureq::Agent {
+pub(crate) fn agent() -> ureq::Agent {
   let mut b = ureq::AgentBuilder::new()
     .timeout_connect(Duration::from_secs(15))
     .timeout_read(Duration::from_secs(30))
