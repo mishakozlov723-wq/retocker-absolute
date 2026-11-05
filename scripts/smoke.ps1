@@ -18,6 +18,16 @@ public static class W {
   [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
   [DllImport("user32.dll")] public static extern void mouse_event(uint f, int x, int y, uint d, UIntPtr e);
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern short GetAsyncKeyState(int vk);
+  [StructLayout(LayoutKind.Sequential)] public struct MI { public int dx; public int dy; public uint data; public uint flags; public uint time; public IntPtr extra; }
+  [StructLayout(LayoutKind.Sequential)] public struct KI { public ushort vk; public ushort scan; public uint flags; public uint time; public IntPtr extra; }
+  [StructLayout(LayoutKind.Explicit)] public struct U { [FieldOffset(0)] public MI mi; [FieldOffset(0)] public KI ki; }
+  [StructLayout(LayoutKind.Sequential)] public struct INPUT { public uint type; public U u; }
+  [DllImport("user32.dll", SetLastError = true)] public static extern uint SendInput(uint n, INPUT[] i, int size);
+  public static string Send(ushort vk, ushort scan, uint flags) {
+    var a = new INPUT[1]; a[0].type = 1; a[0].u.ki.vk = vk; a[0].u.ki.scan = scan; a[0].u.ki.flags = flags;
+    uint r = SendInput(1, a, Marshal.SizeOf(typeof(INPUT))); return r + " (err " + Marshal.GetLastWin32Error() + ")";
+  }
   public static string Title(IntPtr h) { var sb = new StringBuilder(256); GetWindowText(h, sb, 256); return sb.ToString(); }
   public static string At(int x, int y) { var p = new POINT(); p.X = x; p.Y = y; return Title(GetAncestor(WindowFromPoint(p), 2)); }
 }
@@ -47,7 +57,7 @@ Log "foreground: $([W]::Title([W]::GetForegroundWindow()))"
 Shot "01-start"
 
 # the settings window: every page once, and a few states in the preview
-$h = [W]::FindWindow($null, 'Retocker Absolute')
+$h = [W]::FindWindow([NullString]::Value, 'Retocker Absolute')
 $r = New-Object W+RECT
 [W]::GetWindowRect($h, [ref]$r) | Out-Null
 $wx = $r.L; $wy = $r.T
@@ -70,16 +80,33 @@ Log "window under the mouse on the capsule: '$([W]::At($cx, $cy))'"
 Shot "02-hover"
 [W]::SetCursorPos($cx + 200, $cy - 200) | Out-Null; Start-Sleep -Milliseconds 600
 
-# the default hotkey: hold Ctrl+Win (left Ctrl, then left Win), there is no microphone here, so an error is fine
+# can this machine type at all? (input injection into the session)
+Key 0xA2 0x1D 0; Start-Sleep -Milliseconds 120
+Log "keybd_event LCtrl down -> system sees LCtrl: $([W]::GetAsyncKeyState(0xA2) -band 0x8000)"
+Key 0xA2 0x1D 2; Start-Sleep -Milliseconds 120
+Log "SendInput LCtrl down: $([W]::Send(0xA2, 0x1D, 0)) -> system sees LCtrl: $([W]::GetAsyncKeyState(0xA2) -band 0x8000)"
+Log "SendInput LCtrl up: $([W]::Send(0xA2, 0x1D, 2))"
+Start-Sleep -Milliseconds 300
+
+# the default hotkey: hold Ctrl+Win (left Ctrl, then left Win) like a real keyboard
 Key 0xA2 0x1D 0; Start-Sleep -Milliseconds 80; Key 0x5B 0x5B 1
 Start-Sleep -Milliseconds 1800
 Shot "03-hold"
 Key 0x5B 0x5B 3; Start-Sleep -Milliseconds 40; Key 0xA2 0x1D 2
 Start-Sleep -Milliseconds 2500
 Shot "04-released"
-Start-Sleep 3
-Shot "05-later"
 Log "start menu check — foreground: $([W]::Title([W]::GetForegroundWindow()))"
+
+# the same through the app's own test entry (RA_DEBUG): the hook logic, the event, the capsule
+# (there is no microphone here, so the capsule should end up saying so)
+Start-Process $exe -ArgumentList '--test-keys', 'A2+,5B+' | Out-Null
+Start-Sleep -Milliseconds 1500
+Shot "08-test-hold"
+Start-Process $exe -ArgumentList '--test-keys', '5B-,A2-' | Out-Null
+Start-Sleep -Milliseconds 1200
+Shot "09-test-released"
+Start-Sleep 3
+Shot "10-test-later"
 
 # the cross only hides the settings; a second start brings them back
 Click ($wx + 978) ($wy + 17); Start-Sleep -Milliseconds 1200

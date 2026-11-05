@@ -556,7 +556,7 @@ function init() {
   });
   addEventListener('blur', () => { if (hkRec) hkStop(); });
   invoke('app_info').then(a => { info = a; $('#nfoot').innerHTML = `Версия <b>${esc(a.version)}</b>`; }).catch(() => { $('#nfoot').innerHTML = 'Предпросмотр'; });
-  go((location.hash || '').slice(1) || 'home');
+  go((location.hash || '').slice(1) || (RA.auth().vk ? 'home' : 'key'));
   setTimeout(() => checkUpdate(false), 1500);
   setInterval(() => checkUpdate(false), 6 * 3600 * 1000);
 }
