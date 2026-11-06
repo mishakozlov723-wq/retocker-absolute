@@ -417,10 +417,19 @@ function buildText() {
   }
   {
     const r = h('div', 'row col'); r.append(lbl('Словарь', 'Имена, тикеры, термины — через запятую. Groq будет писать их правильно', 'dict'));
-    const t = h('textarea', 'in'); t.placeholder = 'Например: BTCUSDT, Bybit, тейк-профит, шорт, Миша Козлов'; t.rows = 3; t.spellcheck = false;
+    const t = h('textarea', 'in'); t.rows = 3; t.spellcheck = false;
     let tt = 0; t.oninput = () => { clearTimeout(tt); tt = setTimeout(() => { cap.opt({ dict: t.value }); push(); }, 300); };
     r.append(t); P.append(r);
     UI.push(() => { if (document.activeElement !== t) t.value = S_().dict || ''; });
+  }
+  {
+    const r = h('div', 'row col'); r.append(lbl('Слова и фразы-паразиты', 'Через запятую или с новой строки. Умная причёска уберёт их, когда это запинка, и сохранит, если они нужны по смыслу'));
+    const t = h('textarea', 'in'); t.rows = 3; t.spellcheck = false; t.maxLength = 2000;
+    t.setAttribute('aria-label', 'Слова и фразы-паразиты');
+    let tt = 0; t.oninput = () => { clearTimeout(tt); tt = setTimeout(() => { cap.opt({ fillers: t.value }); push(); }, 300); };
+    t.onblur = () => { clearTimeout(tt); cap.opt({ fillers: t.value }); push(); };
+    r.append(t); P.append(r);
+    UI.push(() => { if (document.activeElement !== t) t.value = S_().fillers || ''; });
   }
 }
 
