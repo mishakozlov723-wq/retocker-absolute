@@ -42,7 +42,39 @@ fn perm(_: tauri::Webview, k: PermissionKind) -> PermissionResponse {
   }
 }
 
+// Keep the setting outside WebView storage so it is available before either window is shown.
+fn tray_start_path() -> std::path::PathBuf {
+  sys::local_appdata().join("com.retocker.absolute").join("start-in-tray")
+}
+
+fn starts_in_tray() -> bool {
+  tray_start_path().is_file()
+}
+
+#[tauri::command]
+fn set_start_in_tray(on: bool) -> bool {
+  let path = tray_start_path();
+  if on {
+    path.parent().map(|p| std::fs::create_dir_all(p).is_ok()).unwrap_or(false)
+      && std::fs::write(&path, b"1").is_ok()
+  } else {
+    match std::fs::remove_file(&path) {
+      Ok(()) => true,
+      Err(e) => e.kind() == std::io::ErrorKind::NotFound,
+    }
+  }
+}
+
+fn show_capsule(app: &AppHandle) {
+  if let Some(w) = app.get_webview_window("capsule") {
+    if !w.is_visible().unwrap_or(true) {
+      let _ = w.show();
+    }
+  }
+}
+
 fn show_main(app: &AppHandle, page: Option<&str>) {
+  show_capsule(app);
   if let Some(w) = app.get_webview_window("main") {
     let _ = w.unminimize();
     let _ = w.show();
@@ -150,6 +182,7 @@ fn app_info(app: AppHandle) -> serde_json::Value {
   json!({
     "version": app.package_info().version.to_string(),
     "autostart": win::autostart_get(),
+    "startInTray": starts_in_tray(),
     "logs": logx::dir().map(|d| d.display().to_string()).unwrap_or_default(),
     "updated": UPDATED.get().cloned().unwrap_or_default(),
     "installed": setup::installed_dir().is_some(),
@@ -353,7 +386,7 @@ fn run_app(ctx: tauri::Context<tauri::Wry>, autostarted: bool) {
     }))
     .invoke_handler(tauri::generate_handler![
       set_hotkey, set_keys, hk_record, set_paused, set_hit, paste, copy_text, fg_app, focus_overlay, click_focus, show_settings, quit,
-      app_info, autostart, open_url, open_logs, log, win_ctl, upd_check, upd_install, asr::asr_status, asr::asr_get, asr::asr_cancel,
+      app_info, autostart, set_start_in_tray, open_url, open_logs, log, win_ctl, upd_check, upd_install, asr::asr_status, asr::asr_get, asr::asr_cancel,
       asr::asr_del, asr::asr_warm, asr::asr_start, asr::asr_feed, asr::asr_finish
     ])
     .setup(move |app| {
@@ -364,6 +397,7 @@ fn run_app(ctx: tauri::Context<tauri::Wry>, autostarted: bool) {
       logx::log(&format!("start v{} autostart={autostarted} updated={}", app.package_info().version, UPDATED.get().map(|s| s.as_str()).unwrap_or("")));
       win::autostart_migrate();
       asr::init(&h);
+      let start_in_tray = starts_in_tray();
 
       // the capsule: a transparent layer over the whole work area that lets clicks through except on the capsule
       let cap = WebviewWindowBuilder::new(app, "capsule", WebviewUrl::App("capsule.html".into()))
@@ -380,7 +414,7 @@ fn run_app(ctx: tauri::Context<tauri::Wry>, autostarted: bool) {
         .skip_taskbar(true)
         .focused(false)
         .focusable(false)
-        .visible(true)
+        .visible(!start_in_tray)
         .background_color(tauri::window::Color(0, 0, 0, 0))
         .additional_browser_args(ARGS)
         .on_permission_request(perm)
@@ -444,6 +478,7 @@ fn run_app(ctx: tauri::Context<tauri::Wry>, autostarted: bool) {
       let hh = h.clone();
       hook::start(move |e| match e {
         hook::Ev::Hk(t, other) => {
+          show_capsule(&hh);
           let _ = hh.emit_to("capsule", "hk", json!({ "t": t, "other": other }));
         }
         hook::Ev::Key(k) => {
@@ -457,7 +492,7 @@ fn run_app(ctx: tauri::Context<tauri::Wry>, autostarted: bool) {
       hook::set_hotkey("Ctrl+Win", true);
       overlay_loop(h.clone());
 
-      if !autostarted {
+      if !autostarted && !start_in_tray {
         let _ = main.show();
         let _ = main.set_focus();
       }
