@@ -17,7 +17,7 @@
     // control
     hk: 'Ctrl+Win', mode: 'hold', pos: 'bottom', off: 22, fx: .5, fy: .62, hideFs: true,
     // recognition & insertion
-    lang: 'ru', dict: '', mic: '', paste: 'clip', keepClip: true
+    lang: 'ru', dict: '', fillers: '', mic: '', paste: 'clip', keepClip: true
   };
   const PK = ['bg', 'acc', 'wcol', 'shape', 'scale', 'border', 'shadow', 'glow', 'anim', 'speed', 'idle', 'breathe', 'idleOp', 'hint', 'wave', 'bars', 'sens', 'timer', 'btns', 'proc', 'live', 'reveal'];
   const BASE = Object.fromEntries(PK.map(k => [k, DEF[k]]));
@@ -56,15 +56,15 @@
     try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
     const p = profs(); if (!p) return;
     const was = JSON.stringify(p);
-    // the dictionary and the microphone are the same in every profile
-    p.list.forEach(x => { if (x.id === p.cur) x.v = { ...S }; else { x.v.dict = S.dict; x.v.mic = S.mic; } });
+    // the dictionary, filler phrases and microphone are the same in every profile
+    p.list.forEach(x => { if (x.id === p.cur) x.v = { ...S }; else { x.v.dict = S.dict; x.v.fillers = S.fillers; x.v.mic = S.mic; } });
     if (JSON.stringify(p) !== was) setProfs(p);
   }
   // turn a profile on (manual: a profile without programs becomes the one for all the other programs)
   function useProf(id, manual) {
     const p = profs(), c = p && p.list.find(x => x.id === id); if (!c) return null;
     p.cur = id; if (manual && !c.apps.length) p.base = id; setProfs(p);
-    const S = { ...DEF, ...c.v }; for (const k in S) if (!(k in DEF)) delete S[k];
+    const S = { ...DEF, ...c.v, fillers: load().fillers }; for (const k in S) if (!(k in DEF)) delete S[k];
     save(S); return S;
   }
   const appKey = s => String(s || '').trim().toLowerCase().replace(/\.exe$/, '');
