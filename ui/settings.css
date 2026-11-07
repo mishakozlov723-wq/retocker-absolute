@@ -292,3 +292,9 @@ select.in option{background:#262626}
 .pfa .ac svg{width:10px;height:10px}
 .pfa .dd{height:26px;font-size:12px}
 .pfa .in{height:26px;width:150px;font-size:12px}
+
+/* approximate Groq limits */
+.limit-card{padding:17px 18px;margin:7px 0;background:var(--card);border:1px solid var(--ln);border-radius:11px}
+.limit-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.limit-top h3{font-size:13px;font-weight:750}.limit-top p{font-size:11.5px;color:var(--tx3);margin-top:2px}.limit-top>span{font-size:10px;color:var(--tx3);font-weight:700;letter-spacing:.05em}
+.limit-value{font-size:22px;letter-spacing:-.03em;font-weight:750;margin:15px 0 9px;font-variant-numeric:tabular-nums}.limit-value small{font-size:12px;letter-spacing:0;font-weight:600;color:var(--tx3)}
+.limit-bar{height:6px;border-radius:8px;background:rgba(255,255,255,.08);overflow:hidden}.limit-bar i{display:block;height:100%;background:var(--ok);border-radius:8px;transition:width .25s}.limit-caption,.limit-note{font-size:11.5px;color:var(--tx3);margin-top:9px}.limit-note{margin:17px 10px 0;line-height:1.5}

@@ -43,6 +43,7 @@ jobs:
         run: |
           node scripts/test-fillers.mjs
           node scripts/test-target-cleanup.mjs
+          node scripts/test-usage.mjs
 
       - name: Build
         shell: bash
