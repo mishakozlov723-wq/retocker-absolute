@@ -1,5 +1,4 @@
 'use strict';
-// The settings window: pages on the left, a live preview of the capsule on top (the same engine as the real one).
 (() => {
 const RA = window.RA, { invoke, listen, log, esc, words_, pl } = RA;
 window.onerror = (m, src, l) => log(`settings error: ${m} @${String(src || '').split('/').pop()}:${l}`);
@@ -29,7 +28,6 @@ async function copy(t) {
   const a = document.createElement('textarea'); a.value = t; document.body.append(a); a.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (x) {} a.remove(); return ok;
 }
 const openUrl = url => RA.tauri ? invoke('open_url', { url }) : window.open(url, '_blank');
-// settings changed here: tell the real capsule (it also hears the storage event)
 let pushT = 0;
 function push() { clearTimeout(pushT); pushT = setTimeout(() => RA.emitTo('capsule', 'cfg'), 60); }
 const UI = [];
@@ -503,7 +501,6 @@ async function listMics() {
     try { const st = await navigator.mediaDevices.getUserMedia({ audio: true }); st.getTracks().forEach(t => t.stop()); ds = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput'); } catch (e) {}
   }
   const curv = S_().mic;
-  // the Windows default shows which device it is right now («По умолчанию - Микрофон (Realtek…)»)
   const dl = (ds.find(d => d.deviceId === 'default') || {}).label || '';
   const dn = dl.replace(/^[^-–—]*[-–—]\s*/, '').trim();
   const items = [{ v: '', t: 'Как в Windows', sub: dn ? 'Сейчас: ' + dn : 'Тот, что выбран в Windows' }];
@@ -656,7 +653,6 @@ const LATEST = 'https://retocker-voice.web.app/absolute/latest.json';
 let info = { version: '', logs: '' }, upd = null, updRun = false;
 const newer = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; };
 const updSt = (cls, t) => { const st = $('#updSt'); if (st) { st.className = 'status ' + cls; st.lastChild.textContent = t; } };
-// the app asks the signed manifest itself (no browser rules in the way); a plain fetch only in the browser preview
 async function checkUpdate(manual) {
   if (updRun) return;
   if (manual) updSt('wait', 'Проверяю…');
@@ -674,7 +670,6 @@ async function checkUpdate(manual) {
     refreshHome();
   } catch (e) { if (manual) updSt('bad', 'Не получилось проверить — нет связи'); else updSt('', 'Проверю позже'); }
 }
-// «Обновить»: the app downloads the new version, checks its signature, puts it in place and restarts
 function startUpdate() {
   if (!upd || updRun) return;
   if (!upd.can || !RA.tauri) { openUrl(upd.url); return; }
@@ -741,7 +736,6 @@ function streak(days) {
   return n;
 }
 function dur(min) { if (min < 1) return 'меньше минуты'; if (min < 60) return Math.round(min) + ' мин'; const hh = Math.floor(min / 60), mm = Math.round(min % 60); return hh + ' ч' + (mm ? ' ' + mm + ' мин' : ''); }
-// profiles: the page lives in prof.js
 const { buildProf, paintProf, profNav } = window.PROFUI({ RA, $, h, page, head, sec, row, dd, toast, push, refresh, SHOW, cap: () => cap, cur: () => cur });
 
 function buildHome() { page('home'); P.append(h('div', '', '')); SHOW.home = refreshHome; }
@@ -764,7 +758,6 @@ function refreshHome() {
     <div class="sc"><small>Всего</small><b>${fmtN(st.w)}</b><span>${st.n} ${pl(st.n, 'диктовка', 'диктовки', 'диктовок')}</span></div>
     <div class="sc"><small>Скорость</small><b>${wpm ? Math.round(wpm) : '—'}</b><span>слов в минуту</span></div>
     <div class="sc"><small>Серия</small><b>${streak(st.days)}</b><span>${pl(streak(st.days), 'день', 'дня', 'дней')} подряд</span></div></div>`;
-  // the last 14 days
   const days = []; const dd = new Date(); dd.setDate(dd.getDate() - 13);
   for (let i = 0; i < 14; i++) { const k = RA.dayKey(dd); days.push({ k, w: (st.days[k] || { w: 0 }).w, d: dd.getDate(), dow: DOW[dd.getDay()], today: i === 13 }); dd.setDate(dd.getDate() + 1); }
   const mx = Math.max(10, ...days.map(x => x.w));
@@ -779,18 +772,22 @@ function refreshHome() {
   el.querySelectorAll('[data-upd]').forEach(b => b.onclick = () => { if (!upd) return; if (upd.can && RA.tauri) { go('about'); startUpdate(); } else openUrl(upd.url); });
 }
 
+const { buildLimits, refreshLimits } = window.LIMITSUI({ $, page, SHOW, fmtN });
+
 /* ---------------- start */
 function init() {
-  buildPreviewBar(); buildHome(); buildCaps(); buildText(); buildCtl(); buildProf(); buildKey(); buildAbout(); profNav();
+  buildPreviewBar(); buildHome(); buildCaps(); buildText(); buildCtl(); buildProf(); buildKey(); buildLimits(); buildAbout(); profNav();
   if (window.TIPS) window.TIPS.init();
   refresh(); keyState();
   listen('page', e => go(String(e.payload || 'home')));
   listen('rec', e => hkEvent(e.payload));
   listen('stats', () => { if (cur === 'home') refreshHome(); });
+  listen('usage', () => { if (cur === 'limits') refreshLimits(); });
   listen('upd', e => updEv(e.payload || {}));
   addEventListener('storage', e => {
     if (e.key === RA.KEY) { cap.reload(); refresh(); if (cur === 'home') refreshHome(); }
     if (e.key === RA.STATS && cur === 'home') refreshHome();
+    if (window.USAGE && e.key === window.USAGE.KEY && cur === 'limits') refreshLimits();
     if (e.key === RA.AUTH) keyState();
     if (e.key === RA.PROF) paintProf();
   });
@@ -802,5 +799,6 @@ function init() {
   go((location.hash || '').slice(1) || (RA.auth().vk ? 'home' : 'key'));
   setTimeout(() => checkUpdate(false), 1500);
   setInterval(() => checkUpdate(false), 6 * 3600 * 1000);
+  setInterval(() => { if (cur === 'limits') refreshLimits(); }, 60000);
 }
 })();
