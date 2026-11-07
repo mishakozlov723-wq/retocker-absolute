@@ -486,26 +486,24 @@ async function recognize(f, blob, dur) {
   if (!txt) { fail('Ничего не услышал'); return; }
   finalF = f;
   const live = panelOpen && words.some(w => !w.dead);
-  const pre = S.clean && S.smart && ENV.polish && live ? Promise.resolve().then(() => ENV.polish(txt)) : null;
-  if (pre) pre.catch(() => {});
   if (live) { fixText(txt); await sleep(FIXHOLD / K()); }
   else { setLiveText(txt); await sleep(panelOpen ? 260 : 0); }
   if (f !== flow) return;
-  return polishAndGo(f, true, dur, pre);
+  return polishAndGo(f, true, dur);
 }
 // how long the correction is shown before the text goes in (the letters are settled by then)
 const FIXHOLD = 680;
 let finalF = 0;
-async function polishAndGo(f, real, dur = 0, pre = null) {
+async function polishAndGo(f, real, dur = 0) {
   const k = K();
   if (S.clean) {
     if (real) {
-      let done = false;
-      if (ENV.polish) {
-        const raw = words.filter(w => !w.dead).map(w => w.t).join(' ');
-        try { const c = await (pre || ENV.polish(raw)); if (f !== flow) return; if (c) { planTo(c); done = true; } } catch (e) { RA.log('polish: ' + e.message); }
+      // Start with exactly the same basic cleanup as when smart cleanup is off.
+      planLocal();
+      if (S.smart && ENV.polish) {
+        const base = cleanOf(words.filter(w => !w.dead));
+        try { const c = await ENV.polish(base); if (f !== flow) return; if (c && c !== base) planTo(c); } catch (e) { RA.log('polish: ' + e.message); }
       }
-      if (!done) planLocal();
     }
     if (panelOpen) { await cleanAnim(f); if (f !== flow) return; if (!(S.review || rev1)) await sleep(real ? 380 : 650 / k); }
     else if (!real) await sleep(600 / k);
