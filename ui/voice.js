@@ -54,6 +54,7 @@
     let text;
     if (url) {
       const body = { key, audio: await b64(blob), mime: type, ext, model, lang, prompt };
+      if (window.USAGE) window.USAGE.record(model, o.sec);
       const j = await viaProxy(url, body, ms);
       if (j.code !== 200) throw mapErr(j.code, j.error, false);
       text = j.text || '';
@@ -62,6 +63,7 @@
       fd.append('file', blob, 'audio.' + ext); fd.append('model', model); fd.append('response_format', 'json'); fd.append('temperature', '0');
       if (lang) fd.append('language', lang);
       if (prompt) fd.append('prompt', prompt);
+      if (window.USAGE) window.USAGE.record(model, o.sec);
       const r = await timed(GROQ + '/audio/transcriptions', { method: 'POST', headers: { Authorization: 'Bearer ' + key }, body: fd }, ms);
       if (!r.ok) throw mapErr(r.status, await r.text().catch(() => ''), true);
       text = ((await r.json()) || {}).text || '';
@@ -82,10 +84,12 @@
     const { key, url, a } = cfg();
     if (url) {
       if (!a.chat) return null; // an older proxy without the «chat» action: clean locally
+      if (window.USAGE) window.USAGE.record(body.model);
       const j = await viaProxy(url, { key, chat: body }, 12000);
       if (j.code !== 200) throw mapErr(j.code, j.error, false);
       return j.text || '';
     }
+    if (window.USAGE) window.USAGE.record(body.model);
     const r = await timed(GROQ + '/chat/completions', { method: 'POST', headers: { Authorization: 'Bearer ' + key, 'content-type': 'application/json' }, body: JSON.stringify(body) }, 12000);
     if (!r.ok) throw mapErr(r.status, await r.text().catch(() => ''), true);
     const j = await r.json();

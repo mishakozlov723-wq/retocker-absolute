@@ -440,7 +440,7 @@ function partialLoop(r, now) {
     if (!panelOpen || !ENV.recognize || !w || w.chunks.length <= 3 || r.busy || w.peak <= .2) { r.pt = setTimeout(() => { if (rec === r) partialLoop(r); }, 300); return; }
     r.busy = true; const sent = r.lastP = performance.now();
     try {
-      const txt = await ENV.recognize(blobOf(w), { partial: true });
+      const txt = await ENV.recognize(blobOf(w), { partial: true, sec: Math.max(0, (sent - r.t0) / 1000) });
       if (rec === r && state === 'rec' && txt != null) { const s = stripHall(txt); if (s) setLiveText(s, { upto: sent - 200 }); }
       r.back = 0;
     } catch (e) { r.back = e.code === 429 ? Math.min(30000, (r.back || 4000) * 2) : Math.min(15000, (r.back || 2000) * 1.5); }
