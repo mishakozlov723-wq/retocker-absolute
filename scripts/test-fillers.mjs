@@ -31,4 +31,17 @@ S=RA.load(); S.fillers='ну';RA.save(S);reply='Да.';await VOICE.polish('ну 
 S.smart=false;RA.save(S);const x=req.length; assert.equal(await VOICE.polish('что-то тут есть'),null);assert.equal(req.length,x);
 S.smart=true;RA.save(S);RA.auth=()=>({vk:'gsk_test',vu:'https://script.google.com/macros/s/abc/exec',chat:true});reply='Я добавлю кнопку.';assert.equal(await VOICE.polish('Я добавлю ну кнопку'),reply);assert.equal(req.at(-1).body.chat.messages[1].content,'Я добавлю ну кнопку');
 RA.auth=()=>({vk:'gsk_test',vu:'https://script.google.com/macros/s/abc/exec',chat:false});assert.equal(await VOICE.polish('Я добавлю ну кнопку'),null);
-console.log('OK: defaults, persistence, profiles, direct/proxy prompt, disabled/fallback, short utterances');
+RA.auth=()=>({vk:'gsk_test',vu:'',chat:true});
+S=RA.load(); S.fillers='как его зовут, ну'; RA.save(S);
+reply='Добавлю кнопку.';
+assert.equal(await VOICE.polish('как его зовут как его зовут как его зовут добавлю кнопку'),reply);
+reply='Добавлю кнопку.';
+assert.equal(await VOICE.polish('КАК ЕГО ЗОВУТ, как его зовут, добавлю кнопку'),reply);
+let count=req.length; assert.equal(await VOICE.polish('нужный'),null); assert.equal(req.length,count);
+S.fillers='ну, ну это'; RA.save(S); reply='Да.';
+assert.equal(await VOICE.polish('ну это ну это ну это ну это да'),reply);
+S.fillers=''; RA.save(S); reply='Кнопку.';
+assert.equal(await VOICE.polish('Сегодня нужно добавить новую кнопку в главное окно настроек приложения'),null);
+S.fillers='ну'; RA.save(S); reply='Я забыл, как его зовут.';
+assert.equal(await VOICE.polish('Я забыл как его зовут'),reply);
+console.log('OK: persistence, profiles, direct/proxy, short utterances, filler-heavy cleanup, whole-word matching, overlap, semantic preservation, truncation guard');
