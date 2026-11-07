@@ -39,6 +39,11 @@ jobs:
           node scripts/prepare.mjs "$VER" 2>&1 | tee -a ci.log
           npx tauri icon app-icon.svg -o src-tauri/icons 2>&1 | tail -3 | tee -a ci.log
 
+      - name: Test filler cleanup
+        run: |
+          node scripts/test-fillers.mjs
+          node scripts/test-target-cleanup.mjs
+
       - name: Build
         shell: bash
         run: |
