@@ -5,7 +5,7 @@
   const RA = window.RA;
   const GROQ = 'https://api.groq.com/openai/v1';
   const FINAL = 'whisper-large-v3', FAST = 'whisper-large-v3-turbo';
-  const CHAT = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+  const CHAT = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
 
   function E(msg, act, code) { const e = new Error(msg); e.act = act; e.code = code; return e; }
   function mapErr(code, detail, direct) {
@@ -115,7 +115,7 @@
     const t0 = performance.now();
     for (const model of CHAT) {
       try {
-        const out = await chat({ model, temperature: 0, max_tokens: Math.min(4000, 60 + n * 6), messages: [{ role: 'system', content: sys }, { role: 'user', content: text }] });
+        const out = await chat({ model, temperature: 0, reasoning_effort: 'low', reasoning_format: 'hidden', max_tokens: Math.min(4000, 512 + n * 8), messages: [{ role: 'system', content: sys }, { role: 'user', content: text }] });
         if (out == null) return null;
         const c = String(out).trim().replace(/^["«]([\s\S]*)["»]$/, '$1').trim();
         const m = RA.wc(c);
@@ -123,7 +123,7 @@
         if (!c || m < remaining * .45 - 2 || m > n * 1.25 + 3 || /^(вот|конечно|исправленный|итоговый)\b/i.test(c)) { RA.log(`polish rejected (${n} -> ${m} words)`); return null; }
         RA.log(`polished ${n} -> ${m} words in ${Math.round(performance.now() - t0)} ms (${model})`);
         return c;
-      } catch (e) { if (e.code !== 429) throw e; }
+      } catch (e) { if ((e.code === 404 || e.code === 429 || e.code >= 500) && model !== CHAT[CHAT.length - 1]) { RA.log(`polish: ${model} unavailable (${e.code}); trying fallback`); continue; } throw e; }
     }
     return null;
   }

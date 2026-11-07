@@ -45,3 +45,14 @@ assert.equal(await VOICE.polish('Сегодня нужно добавить но
 S.fillers='ну'; RA.save(S); reply='Я забыл, как его зовут.';
 assert.equal(await VOICE.polish('Я забыл как его зовут'),reply);
 console.log('OK: persistence, profiles, direct/proxy, short utterances, filler-heavy cleanup, whole-word matching, overlap, semantic preservation, truncation guard');
+
+// Check the actual configured model and fallback when Groq returns a missing-model 404.
+S.smart=true; S.fillers='как её зовут'; RA.save(S);
+RA.auth=()=>({vk:'gsk_test',vu:'https://script.google.com/macros/s/abc/exec',chat:true});
+let models=[];
+ctx.fetch=async (url,init)=>{const body=JSON.parse(init.body).chat; models.push(body.model);
+  assert.equal(body.reasoning_effort,'low'); assert.equal(body.reasoning_format,'hidden'); assert.ok(body.max_tokens >= 512);
+  return {text:async()=>JSON.stringify(models.length===1?{code:404,error:'model not found'}:{code:200,text:'Зелёная кнопка Save.'})};};
+assert.equal(await VOICE.polish('Вот как её зовут зелёная кнопка Save'), 'Зелёная кнопка Save.');
+assert.equal(models.join(','),'openai/gpt-oss-120b,openai/gpt-oss-20b');
+console.log('OK: supported model settings and 404 fallback');
