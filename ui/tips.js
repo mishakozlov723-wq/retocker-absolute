@@ -20,6 +20,12 @@
         mc.style.width = st === 'done' ? '62px' : st === 'proc' ? '46px' : st === 'hint' ? '96px' : '';
       },
       dotBig(on) { mc.classList.toggle('big', on); },
+      grow(on) { // «Текст внутри капсулы»: the capsule itself becomes the block, the text is inside it (words(…, { cap: true }))
+        let t = mc.querySelector('.mt');
+        if (on && !t) { t = document.createElement('span'); t.className = 'mt'; mc.append(t); }
+        if (t) t.style.opacity = on ? '' : '0';
+        mc.classList.toggle('card', on);
+      },
       capHide(on) { mc.style.opacity = on ? '0' : ''; },
       capAt(x, y) { if (x == null) { mc.style.left = ''; mc.style.top = ''; mc.style.bottom = ''; return; } mc.style.left = x + 'px'; mc.style.top = y + 'px'; mc.style.bottom = 'auto'; },
       panel(on, html, o = {}) {
@@ -28,7 +34,7 @@
         mp.classList.toggle('on', on);
       },
       words(list, o = {}) { // words appear one by one in the panel (or in the document)
-        const box = o.doc ? tx : mp;
+        const box = o.doc ? tx : o.cap ? mc.querySelector('.mt') : mp;
         box.innerHTML = '';
         list.forEach((w, i) => setTimeout(() => { const s = document.createElement('span'); s.className = 'w'; s.textContent = w + ' '; s.style.opacity = 0; box.append(s); requestAnimationFrame(() => { s.style.opacity = 1; }); }, i * (o.step || 170)));
       },
@@ -71,6 +77,9 @@
     pdot: { t: () => 'Нажал на точку — текст открылся, а <b>точка плавно стала больше</b>. Закрыл — уменьшилась обратно.', s: [
       [300, s => s.cap('rec')], [300, s => s.cur(dotX + 4, capY - 2)], [700, s => s.click()], [120, s => { s.panel(true, ''); s.dotBig(true); s.words(['Смотри,', 'сегодня', 'биткоин', 'пробил…'], { step: 150 }); }],
       [2100, s => s.click()], [120, s => { s.panel(false); s.dotBig(false); }], [1300, s => s.cur(270, 150)], [500, s => s.cap('idle')], [700, () => {}]] },
+    inl: { t: () => 'Нажал на точку — <b>капсула сама плавно выросла</b>: текст, волна и таймер в одном блоке, без отдельной панели. Нажал ещё раз — свернулась обратно.', s: [
+      [300, s => s.cap('rec')], [300, s => s.cur(dotX + 4, capY - 2)], [700, s => s.click()], [120, s => { s.grow(true); s.words(['Смотри,', 'сегодня', 'биткоин', 'пробил', 'сопротивление…'], { cap: true, step: 150 }); }],
+      [2400, s => s.click()], [120, s => s.grow(false)], [1300, s => s.cur(270, 150)], [500, s => s.cap('idle')], [700, () => {}]] },
     clean: { t: () => 'Убирает «эээ», «ну» и лишние повторы, ставит заглавные буквы.', s: [
       [300, s => { s.panel(true, ''); s.cap('proc'); s.words(['ну', 'эээ', 'смотри,', 'завтра', 'лонг'], { step: 110 }); }], [1100, s => s.strike([0, 1])], [700, s => { s.vanish([0, 1]); s.swap(2, 'Смотри,'); }],
       [1300, s => { s.panel(false); s.cap('done'); s.docText('Смотри, завтра лонг'); }], [1300, s => s.cap('idle')], [900, () => {}]] },

@@ -280,6 +280,7 @@ function buildCaps() {
   sec('Во время записи');
   sw('timer', 'Таймер', 'Сколько секунд идёт запись', { pv: 'rec' });
   sw('btns', 'Кнопки ✕ и ✓', 'Отменить или закончить мышкой', { pv: 'rec' });
+  sw('inl', 'Текст внутри капсулы', 'Вместо отдельной панели капсула сама плавно вырастает: текст, волна и таймер — одним блоком', { pv: 'dot', tip: 'inl', badge: 'НОВОЕ', dis: () => S_().live === 'off' && !S_().review });
   chips('proc', 'Пока распознаёт', [
     ['shimmer', 'Надпись', I('<path d="M4 8h16" stroke-width="3" opacity=".35"/><path d="M9 8h5" stroke-width="3"/>')],
     ['dots', 'Точки', I('<g fill="currentColor" stroke="none"><circle cx="7" cy="9" r="1.8"/><circle cx="12" cy="6.5" r="1.8"/><circle cx="17" cy="9" r="1.8" opacity=".5"/></g>')],

@@ -10,6 +10,8 @@
     timer: true, btns: false, proc: 'shimmer', sounds: false,
     // live text
     live: 'tap', pdot: false, reveal: 'letters', fs: 15, pw: 420,
+    // «Текст внутри капсулы»: no separate panel — the capsule itself grows into the block with the text
+    inl: false,
     // the local speech model (when it is downloaded): words at once; the colour of the corrections afterwards
     fast: true, fixc: 'blue',
     // after speech
