@@ -16,6 +16,8 @@
     fast: true, fixc: 'blue',
     // after speech
     review: false, revBtn: true, clean: true, smart: true,
+    // «Мгновенный перевод»: the language the dictated text is translated into before it is inserted ('off' — as spoken)
+    tr: 'off',
     // control
     hk: 'Ctrl+Win', mode: 'hold', pos: 'bottom', off: 22, fx: .5, fy: .62, hideFs: true,
     // recognition & insertion
@@ -33,6 +35,9 @@
   const BGS = [['graphite', '#1f1f1f', 'Графит'], ['coal', '#0c0c0c', 'Уголь'], ['glass', null, 'Стекло'], ['light', '#f2f2f0', 'Светлый']];
   // the colour corrected words flash in when the final text comes: [id, on a dark panel, on a light one, name]
   const FIXC = [['blue', '#9cc3ff', '#2f6fd0', 'Голубой'], ['mint', '#8fe0b8', '#1f8f5c', 'Мята'], ['amber', '#ffd27a', '#b57800', 'Янтарь'], ['lilac', '#c9b3ff', '#6b4fd0', 'Лаванда'], ['rose', '#ffa8c8', '#c0396f', 'Роза'], ['acc', null, null, 'Как акцент'], ['off', null, null, 'Без подсветки']];
+  // «Мгновенный перевод»: [code, the name in the settings, the name the language model is told]
+  const TRL = [['en', 'English', 'English'], ['ru', 'Русский', 'Russian'], ['zh', '中文', 'Simplified Chinese'], ['es', 'Español', 'Spanish'], ['de', 'Deutsch', 'German'], ['fr', 'Français', 'French'],
+    ['uk', 'Українська', 'Ukrainian'], ['kk', 'Қазақша', 'Kazakh'], ['tr', 'Türkçe', 'Turkish'], ['ja', '日本語', 'Japanese']];
   const ACCS = [['#ffffff', 'Белый'], ['#a8a8a8', 'Серебро'], ['#d9c7a7', 'Песок'], ['#7fd1ae', 'Мята'], ['#7fb4f0', 'Небо'], ['#b49cf0', 'Лаванда'], ['#f09cc0', 'Роза'], ['#f0b46a', 'Янтарь'], ['#f08a7a', 'Коралл']];
 
   function load() {
@@ -162,6 +167,6 @@
   const emitTo = (label, ev, p) => T ? T.event.emitTo(label, ev, p === undefined ? null : p).catch(() => {}) : Promise.resolve();
   const log = m => { try { invoke('log', { msg: String(m) }).catch(() => {}); } catch (e) {} };
 
-  window.RA = { KEY, DEF, PK, PROF, profs, setProfs, useProf, profFor, appKey, PRESETS, BGS, ACCS, FIXC, pcmTap, asrFeed, load, save, AUTH, auth, setAuth, isProxy, hasKey, STATS, stats, addStat, dayKey,
+  window.RA = { KEY, DEF, PK, PROF, profs, setProfs, useProf, profFor, appKey, PRESETS, BGS, ACCS, FIXC, TRL, pcmTap, asrFeed, load, save, AUTH, auth, setAuth, isProxy, hasKey, STATS, stats, addStat, dayKey,
     pl, words_, wc, esc, hkPart, hkParts, hkLabel, isModOnly, rgb, lum, contrast, hexA, invoke, listen, emitTo, log, tauri: !!T };
 })();

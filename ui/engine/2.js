@@ -510,9 +510,20 @@ async function polishAndGo(f, real, dur = 0) {
   } else if (panelOpen && !(S.review || rev1)) await sleep(real ? 300 : 500 / k);
   if (f !== flow) return;
   const list = words.filter(w => !w.dead);
-  const text = S.clean ? cleanOf(list) : list.map(w => w.t).join(' ');
+  let text = S.clean ? cleanOf(list) : list.map(w => w.t).join(' ');
+  // «Мгновенный перевод»: the finished text goes in already translated (and is shown that way first, if the text is open)
+  noTr = false;
+  if (real && S.tr && S.tr !== 'off' && ENV.translate && text) {
+    procTxt.textContent = lTitle.textContent = 'Перевожу…'; retarget();
+    let t = null;
+    try { t = await ENV.translate(text, S.tr); } catch (e) { RA.log('translate: ' + e.message); }
+    if (f !== flow) return;
+    if (t) { text = t; if (panelOpen) { setLiveText(t); await sleep(520 / k); if (f !== flow) return; } }
+    else noTr = true; // no answer: the text goes in as it was spoken, and the capsule says so
+  }
   if (S.review || rev1) toReview(text); else insert(text, dur);
 }
+let noTr = false;
 function retry() {
   if (!lastAudio) { toIdle(); return; }
   clearTimeout(idleT); const f = ++flow;
@@ -556,7 +567,7 @@ function insert(text, dur = 0) {
   if (!text) { if (wasEditing && ENV.focus) ENV.focus(false); toIdle(); return; }
   lastText = text;
   const n = wc(text);
-  doneTxt.textContent = 'Вставлено · ' + words_(n);
+  doneTxt.textContent = (noTr ? 'Без перевода · ' : 'Вставлено · ') + words_(n); noTr = false;
   setState('done'); closePanel(); sound('done');
   if (ENV.onInsert) Promise.resolve(ENV.onInsert(text, { words: n, sec: dur })).catch(e => {
     RA.log('insert: ' + (e && e.message || e));
