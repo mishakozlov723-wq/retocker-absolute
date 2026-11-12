@@ -140,9 +140,35 @@ Start-Sleep 3
 Log "after a second start: settings visible=$([W]::IsWindowVisible($h))"
 Shot "07-second-start"
 
+# start in tray: the capsule stays hidden until the hotkey, and showing it must leave the screen clickable
+$dead = ''
+if ($p.HasExited) { $dead = "APP EXITED, code $($p.ExitCode)" } else { Stop-Process -Id $p.Id -Force; $p.WaitForExit(5000) | Out-Null }
+$tray = Join-Path $env:LOCALAPPDATA "com.retocker.absolute\start-in-tray"
+Set-Content -Path $tray -Value '1' -NoNewline
+# the capsule window's title, spelled with codes so this file stays plain ASCII
+$capTitle = 'Retocker Voice ' + [char]0x2014 + ' ' + (-join [char[]](0x43A, 0x430, 0x43F, 0x441, 0x443, 0x43B, 0x430))
+$p2 = Start-Process $exe -PassThru
+Start-Sleep 10
+$c = [W]::FindWindow([NullString]::Value, $capTitle)
+Log "tray start: capsule visible=$([W]::IsWindowVisible($c)), settings visible=$([W]::IsWindowVisible([W]::FindWindow([NullString]::Value, 'Retocker Voice')))"
+[W]::SetCursorPos($cx - 300, $cy - 300) | Out-Null
+Key 0xA2 0x1D 0; Start-Sleep -Milliseconds 80; Key 0x5B 0x5B 1
+Start-Sleep -Milliseconds 1200
+Key 0x5B 0x5B 3; Start-Sleep -Milliseconds 40; Key 0xA2 0x1D 2
+Start-Sleep -Milliseconds 1500
+$under = [W]::At($cx - 300, $cy - 300)
+Log "tray start, after the hotkey: capsule visible=$([W]::IsWindowVisible($c)), window under the mouse away from the capsule: '$under', foreground: '$([W]::Title([W]::GetForegroundWindow()))'"
+Shot "08-tray-hotkey"
+Remove-Item $tray -ErrorAction SilentlyContinue
+$shown = [W]::IsWindowVisible($c)
+$blocked = $under -eq $capTitle
+
 $logf = Join-Path $env:LOCALAPPDATA "com.retocker.absolute\logs\retocker-voice.log"
 Log "---- app log"
 if (Test-Path $logf) { Get-Content $logf | ForEach-Object { Log $_ } } else { Log "no log at $logf" }
-if ($p.HasExited) { Log "APP EXITED, code $($p.ExitCode)"; exit 1 }
-Stop-Process -Id $p.Id -Force
+if ($dead) { Log $dead; exit 1 }
+if ($p2.HasExited) { Log "APP EXITED after a start in tray, code $($p2.ExitCode)"; exit 1 }
+Stop-Process -Id $p2.Id -Force
+if (-not $shown) { Log "FAIL: the hotkey did not show the capsule after a start in tray"; exit 1 }
+if ($blocked) { Log "FAIL: after a start in tray the overlay takes the clicks of the whole screen"; exit 1 }
 Log "ok"

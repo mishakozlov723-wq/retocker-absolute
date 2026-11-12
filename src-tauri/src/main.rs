@@ -68,6 +68,8 @@ fn set_start_in_tray(on: bool) -> bool {
 fn show_capsule(app: &AppHandle) {
   if let Some(w) = app.get_webview_window("capsule") {
     if !w.is_visible().unwrap_or(true) {
+      // showing may activate the capsule: remember who had the keyboard, paste gives it back
+      win::note_front();
       let _ = w.show();
     }
   }
@@ -285,9 +287,13 @@ fn overlay_loop(app: AppHandle) {
       }
       was_down = down;
       let want = inside || lock;
+      // On every tick, not only on a change: showing the hidden capsule (start in tray) makes Tauri rewrite
+      // the window styles, and without click-through the transparent layer takes every click on the screen.
+      if win::visible(h) {
+        win::set_clickthrough(h, !want);
+      }
       if want != interactive {
         interactive = want;
-        win::set_clickthrough(h, !want);
         let _ = app.emit_to("capsule", "hit", json!({ "inside": want }));
       }
       if last_area.elapsed() > Duration::from_millis(1000) {
