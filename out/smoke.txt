@@ -1,0 +1,87 @@
+exe: D:\a\retocker-absolute\retocker-absolute\src-tauri\target\release\retocker-voice.exe (7520768 bytes)
+work area: {X=0,Y=0,Width=1024,Height=720}
+foreground: Retocker Voice
+settings window: 12,20 - 1028,709 visible=True
+window under the mouse away from the capsule: 'Retocker Voice'
+window under the mouse on the capsule: 'Retocker Voice — капсула'
+start menu check — foreground: Retocker Voice
+test hook (hook 131672 err 0): system sees LCtrl: 32768
+test hook saw 2 key events (2 sent)
+after the cross: settings visible=False
+after a second start: settings visible=True
+tray start: capsule visible=False, settings visible=False
+tray start, after the hotkey: capsule visible=True, window under the mouse away from the capsule: 'C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-agent', foreground: 'Retocker Voice — капсула'
+---- app log
+1794481045 start v1.0.64 autostart=false updated=
+1794481054 debug log on (RA_DEBUG=1)
+1794481054 keyboard hook on (thread 8484)
+1794481054 raw keyboard input on (backup for the hook)
+1794481054 js: capsule up 1024x720 dpr 1 hk Ctrl+Win hold
+1794481059 hook thread alive, keys seen 0, raw only 0
+1794481064 hook thread alive, keys seen 0, raw only 0
+1794481069 hook thread alive, keys seen 0, raw only 0
+1794481074 hook thread alive, keys seen 0, raw only 0
+1794481077 keyboard hook is silent: using raw input
+1794481077 keyboard hook on (thread 8484)
+1794481077 raw key vk=A2 (the hook missed it)
+1794481077 key vk=A2 sc=1D fl=0 down -> held=00000001 cand=false other=false active=false swallow=false
+1794481077 raw key vk=5B (the hook missed it)
+1794481077 hook event Hk("down", false)
+1794481077 key vk=5B sc=5B fl=1 down -> held=01000001 cand=true other=false active=false swallow=false
+1794481077 js: state err
+1794481077 js: error: Нет ключа Groq
+1794481079 raw key vk=5B (the hook missed it)
+1794481079 hook event Hk("up", false)
+1794481079 key vk=5B sc=5B fl=81 up -> held=00000001 cand=false other=false active=false swallow=false
+1794481079 raw key vk=A2 (the hook missed it)
+1794481079 key vk=A2 sc=1D fl=80 up -> held=00000000 cand=false other=false active=false swallow=false
+1794481079 hook thread alive, keys seen 0, raw only 4
+1794481081 raw key vk=A2 (the hook missed it)
+1794481081 key vk=A2 sc=1D fl=0 down -> held=00000001 cand=false other=false active=false swallow=false
+1794481081 raw key vk=5B (the hook missed it)
+1794481081 hook event Hk("down", false)
+1794481081 key vk=5B sc=5B fl=1 down -> held=01000001 cand=true other=false active=false swallow=false
+1794481082 js: error: Нет ключа Groq
+1794481082 raw key vk=5B (the hook missed it)
+1794481082 keyboard hook on (thread 8484)
+1794481082 hook event Hk("up", false)
+1794481082 key vk=5B sc=5B fl=81 up -> held=00000001 cand=false other=false active=false swallow=false
+1794481082 raw key vk=A2 (the hook missed it)
+1794481082 key vk=A2 sc=1D fl=80 up -> held=00000000 cand=false other=false active=false swallow=false
+1794481083 js: state idle
+1794481084 hook thread alive, keys seen 0, raw only 8
+1794481084 keyboard hook: the first key arrived
+1794481084 key vk=A2 sc=1D fl=10 down -> held=00000001 cand=false other=false active=false swallow=false
+1794481085 key vk=A2 sc=1D fl=90 up -> held=00000000 cand=false other=false active=false swallow=false
+1794481085 key vk=A2 sc=1D fl=10 down -> held=00000001 cand=false other=false active=false swallow=false
+1794481085 hook event Hk("down", false)
+1794481085 key vk=5B sc=5B fl=11 down -> held=01000001 cand=true other=false active=false swallow=false
+1794481085 js: state err
+1794481085 js: error: Нет ключа Groq
+1794481086 hook event Hk("up", false)
+1794481086 key vk=5B sc=5B fl=91 up -> held=00000001 cand=false other=false active=false swallow=false
+1794481086 key vk=A2 sc=1D fl=90 up -> held=00000000 cand=false other=false active=false swallow=false
+1794481089 hook thread alive, keys seen 8, raw only 8
+1794481091 js: state idle
+1794481092 start v1.0.64 autostart=false updated=
+1794481093 debug log on (RA_DEBUG=1)
+1794481093 keyboard hook on (thread 4556)
+1794481093 raw keyboard input on (backup for the hook)
+1794481093 js: capsule up 1024x720 dpr 1 hk Ctrl+Win hold
+1794481098 hook thread alive, keys seen 0, raw only 0
+1794481102 keyboard hook is silent: using raw input
+1794481102 raw key vk=A2 (the hook missed it)
+1794481102 key vk=A2 sc=1D fl=0 down -> held=00000001 cand=false other=false active=false swallow=false
+1794481102 keyboard hook on (thread 4556)
+1794481102 raw key vk=5B (the hook missed it)
+1794481102 hook event Hk("down", false)
+1794481102 key vk=5B sc=5B fl=1 down -> held=01000001 cand=true other=false active=false swallow=false
+1794481102 js: state err
+1794481102 js: error: Нет ключа Groq
+1794481103 hook thread alive, keys seen 0, raw only 2
+1794481103 raw key vk=5B (the hook missed it)
+1794481103 hook event Hk("up", false)
+1794481103 key vk=5B sc=5B fl=81 up -> held=00000001 cand=false other=false active=false swallow=false
+1794481103 raw key vk=A2 (the hook missed it)
+1794481103 key vk=A2 sc=1D fl=80 up -> held=00000000 cand=false other=false active=false swallow=false
+ok

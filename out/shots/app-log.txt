@@ -1,0 +1,116 @@
+1794481045 start v1.0.64 autostart=false updated=
+1794481054 debug log on (RA_DEBUG=1)
+1794481054 keyboard hook on (thread 8484)
+1794481054 raw keyboard input on (backup for the hook)
+1794481054 js: capsule up 1024x720 dpr 1 hk Ctrl+Win hold
+1794481059 hook thread alive, keys seen 0, raw only 0
+1794481064 hook thread alive, keys seen 0, raw only 0
+1794481069 hook thread alive, keys seen 0, raw only 0
+1794481074 hook thread alive, keys seen 0, raw only 0
+1794481077 keyboard hook is silent: using raw input
+1794481077 keyboard hook on (thread 8484)
+1794481077 raw key vk=A2 (the hook missed it)
+1794481077 key vk=A2 sc=1D fl=0 down -> held=00000001 cand=false other=false active=false swallow=false
+1794481077 raw key vk=5B (the hook missed it)
+1794481077 hook event Hk("down", false)
+1794481077 key vk=5B sc=5B fl=1 down -> held=01000001 cand=true other=false active=false swallow=false
+1794481077 js: state err
+1794481077 js: error: Нет ключа Groq
+1794481079 raw key vk=5B (the hook missed it)
+1794481079 hook event Hk("up", false)
+1794481079 key vk=5B sc=5B fl=81 up -> held=00000001 cand=false other=false active=false swallow=false
+1794481079 raw key vk=A2 (the hook missed it)
+1794481079 key vk=A2 sc=1D fl=80 up -> held=00000000 cand=false other=false active=false swallow=false
+1794481079 hook thread alive, keys seen 0, raw only 4
+1794481081 raw key vk=A2 (the hook missed it)
+1794481081 key vk=A2 sc=1D fl=0 down -> held=00000001 cand=false other=false active=false swallow=false
+1794481081 raw key vk=5B (the hook missed it)
+1794481081 hook event Hk("down", false)
+1794481081 key vk=5B sc=5B fl=1 down -> held=01000001 cand=true other=false active=false swallow=false
+1794481082 js: error: Нет ключа Groq
+1794481082 raw key vk=5B (the hook missed it)
+1794481082 keyboard hook on (thread 8484)
+1794481082 hook event Hk("up", false)
+1794481082 key vk=5B sc=5B fl=81 up -> held=00000001 cand=false other=false active=false swallow=false
+1794481082 raw key vk=A2 (the hook missed it)
+1794481082 key vk=A2 sc=1D fl=80 up -> held=00000000 cand=false other=false active=false swallow=false
+1794481083 js: state idle
+1794481084 hook thread alive, keys seen 0, raw only 8
+1794481084 keyboard hook: the first key arrived
+1794481084 key vk=A2 sc=1D fl=10 down -> held=00000001 cand=false other=false active=false swallow=false
+1794481085 key vk=A2 sc=1D fl=90 up -> held=00000000 cand=false other=false active=false swallow=false
+1794481085 key vk=A2 sc=1D fl=10 down -> held=00000001 cand=false other=false active=false swallow=false
+1794481085 hook event Hk("down", false)
+1794481085 key vk=5B sc=5B fl=11 down -> held=01000001 cand=true other=false active=false swallow=false
+1794481085 js: state err
+1794481085 js: error: Нет ключа Groq
+1794481086 hook event Hk("up", false)
+1794481086 key vk=5B sc=5B fl=91 up -> held=00000001 cand=false other=false active=false swallow=false
+1794481086 key vk=A2 sc=1D fl=90 up -> held=00000000 cand=false other=false active=false swallow=false
+1794481089 hook thread alive, keys seen 8, raw only 8
+1794481091 js: state idle
+1794481092 start v1.0.64 autostart=false updated=
+1794481093 debug log on (RA_DEBUG=1)
+1794481093 keyboard hook on (thread 4556)
+1794481093 raw keyboard input on (backup for the hook)
+1794481093 js: capsule up 1024x720 dpr 1 hk Ctrl+Win hold
+1794481098 hook thread alive, keys seen 0, raw only 0
+1794481102 keyboard hook is silent: using raw input
+1794481102 raw key vk=A2 (the hook missed it)
+1794481102 key vk=A2 sc=1D fl=0 down -> held=00000001 cand=false other=false active=false swallow=false
+1794481102 keyboard hook on (thread 4556)
+1794481102 raw key vk=5B (the hook missed it)
+1794481102 hook event Hk("down", false)
+1794481102 key vk=5B sc=5B fl=1 down -> held=01000001 cand=true other=false active=false swallow=false
+1794481102 js: state err
+1794481102 js: error: Нет ключа Groq
+1794481103 hook thread alive, keys seen 0, raw only 2
+1794481103 raw key vk=5B (the hook missed it)
+1794481103 hook event Hk("up", false)
+1794481103 key vk=5B sc=5B fl=81 up -> held=00000001 cand=false other=false active=false swallow=false
+1794481103 raw key vk=A2 (the hook missed it)
+1794481103 key vk=A2 sc=1D fl=80 up -> held=00000000 cand=false other=false active=false swallow=false
+1794481105 asr selftest: folder C:\Users\runneradmin\AppData\Local\com.retocker.absolute\asr\ru1
+1794481108 asr selftest: downloaded in 3.2s, 50581954 bytes on disk
+1794481111 asr: model loaded in 2447 ms
+1794481111 asr selftest: first words after 0.7s of speech: "слу"
+1794481111 asr selftest: recognised 13.7s of speech in 444 ms (rtf 0.033)
+1794481111 asr selftest: text: слушай напиши серёге что встреча переносится на четверг часа на три и пусть захватят ноутбук посмотрим его стратегию по фьючерсам на нефть если не сможет ну пусть просто скинет таблицу в телеграм я сам разберусь
+1794481115 start v1.0.20 autostart=true
+1794481115 keyboard hook on (thread 3292)
+1794481115 raw keyboard input on (backup for the hook)
+1794481115 js: capsule up 1024x720 dpr 1 hk Ctrl+Win hold
+1794481121 Setup v1.0.64
+1794481130 setup v1.0.64: into C:\Users\runneradmin\AppData\Local\Programs\Retocker Voice autostart=true desktop=true
+1794481131 setup: old Retocker Voice at C:\Users\runneradmin\AppData\Local\Retocker Voice removed: Ok(Some(0))
+1794481132 setup: installed C:\Users\runneradmin\AppData\Local\Programs\Retocker Voice\retocker-voice.exe
+1794481137 start v1.0.64 autostart=false updated=
+1794481138 debug log on (RA_DEBUG=1)
+1794481138 keyboard hook on (thread 4516)
+1794481138 raw keyboard input on (backup for the hook)
+1794481138 js: capsule up 1024x720 dpr 1 hk Ctrl+Win hold
+1794481141 asr: model loaded in 2615 ms
+1794481143 hook thread alive, keys seen 0, raw only 0
+1794481147 test update: manifest Ok("9.9.9")
+1794481147 update: 1.0.64 -> 9.9.9 from D:\a\_temp\payload.exe
+1794481147 update: applied 9.9.9, restarting
+1794481147 waited for the old copy (3588): gone
+1794481148 start v1.0.64 autostart=false updated=9.9.9
+1794481148 debug log on (RA_DEBUG=1)
+1794481148 keyboard hook on (thread 4236)
+1794481148 raw keyboard input on (backup for the hook)
+1794481148 js: capsule up 1024x720 dpr 1 hk Ctrl+Win hold
+1794481151 asr: model loaded in 2447 ms
+1794481153 hook thread alive, keys seen 0, raw only 0
+1794481158 hook thread alive, keys seen 0, raw only 0
+1794481163 hook thread alive, keys seen 0, raw only 0
+1794481164 Uninstall v1.0.64
+1794481170 uninstall: Some("C:\\Users\\runneradmin\\AppData\\Local\\Programs\\Retocker Voice") wipe=false
+1794481181 setup v1.0.64: into C:\Users\runneradmin\AppData\Local\Programs\Retocker Voice autostart=true desktop=false
+1794481181   6% Закрываю Retocker Voice…
+1794481181   18% Убираю прошлую версию…
+1794481181   45% Копирую программу…
+1794481181   70% Создаю ярлыки…
+1794481181   86% Записываю в Windows…
+1794481181   100% Готово
+1794481181 setup: installed C:\Users\runneradmin\AppData\Local\Programs\Retocker Voice\retocker-voice.exe

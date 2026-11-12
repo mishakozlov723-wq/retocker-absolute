@@ -1,0 +1,5 @@
+folder C:\Users\runneradmin\AppData\Local\com.retocker.absolute\asr\ru1
+downloaded in 3.2s, 50581954 bytes on disk
+first words after 0.7s of speech: "слу"
+recognised 13.7s of speech in 444 ms (rtf 0.033)
+text: слушай напиши серёге что встреча переносится на четверг часа на три и пусть захватят ноутбук посмотрим его стратегию по фьючерсам на нефть если не сможет ну пусть просто скинет таблицу в телеграм я сам разберусь

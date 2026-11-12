@@ -1,0 +1,34 @@
+1.0.20 installed at: C:\Users\runneradmin\AppData\Local\Retocker Voice; exe: True
+1.0.20 running: 1
+setup window closed: True (code 0) after about 16 s
+installed at: C:\Users\runneradmin\AppData\Local\Programs\Retocker Voice; exe: True; version: 1.0.64; size: 7344 KB
+uninstall: "C:\Users\runneradmin\AppData\Local\Programs\Retocker Voice\retocker-voice.exe" --uninstall | quiet: "C:\Users\runneradmin\AppData\Local\Programs\Retocker Voice\retocker-voice.exe" --uninstall --silent
+1.0.20 removed: exe True, folder True, key True, apps entry True
+running after setup: 0
+shortcuts: menu True, desktop True, old menu folder left False
+autostart: "C:\Users\runneradmin\AppData\Local\Programs\Retocker Voice\retocker-voice.exe" --autostart
+settings kept: True
+internet mark on the installed exe: False
+  log: 1794481121 Setup v1.0.64
+  log: 1794481130 setup v1.0.64: into C:\Users\runneradmin\AppData\Local\Programs\Retocker Voice autostart=true desktop=true
+  log: 1794481131 setup: old Retocker Voice at C:\Users\runneradmin\AppData\Local\Retocker Voice removed: Ok(Some(0))
+  log: 1794481132 setup: installed C:\Users\runneradmin\AppData\Local\Programs\Retocker Voice\retocker-voice.exe
+test manifest: 345 bytes
+  log: 1794481092 start v1.0.64 autostart=false updated=
+  log: 1794481115 start v1.0.20 autostart=true
+  log: 1794481137 start v1.0.64 autostart=false updated=
+  log: 1794481147 test update: manifest Ok("9.9.9")
+  log: 1794481147 update: 1.0.64 -> 9.9.9 from D:\a\_temp\payload.exe
+  log: 1794481147 update: applied 9.9.9, restarting
+  log: 1794481147 waited for the old copy (3588): gone
+  log: 1794481148 start v1.0.64 autostart=false updated=9.9.9
+old copy left after the update: False
+running after the update: 1
+uninstall window closed: True (code 0)
+after uninstall: exe False, folder False, apps entry False, menu False, desktop False, autostart False
+settings kept: True
+setup temp folders left: 0
+  log: 1794481164 Uninstall v1.0.64
+  log: 1794481170 uninstall: Some("C:\\Users\\runneradmin\\AppData\\Local\\Programs\\Retocker Voice") wipe=false
+quiet install: code 0; exe True; menu True; desktop False
+quiet uninstall: code 0; exe False; folder False; apps entry False; settings False
