@@ -56,6 +56,7 @@
     local,
     recognize: (blob, o) => window.VOICE.recognize(blob, o),
     polish: text => window.VOICE.polish(text),
+    translate: (text, to) => window.VOICE.translate(text, to),
     ready: api => {
       cap = api;
       syncHotkey(api.S);
