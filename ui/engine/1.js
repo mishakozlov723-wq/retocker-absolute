@@ -18,6 +18,7 @@ stage.insertAdjacentHTML('beforeend', `
   <div class="lb" id="lBody"><div class="lt" id="lText"></div></div>
   <div class="lf" id="lFoot"><span class="lk" id="lKeys">Enter — вставить · Esc — отмена</span><span class="grow"></span><button class="lbtn" data-k="copy">Копировать</button><button class="lbtn pri" data-k="insert">Вставить</button></div>
 </div></div>
+<div class="pr" id="pr" aria-hidden="true"><button class="lchk" id="rRev" data-k="rev1" title="Проверю перед вставкой — только эту диктовку">Проверю перед вставкой</button><span class="grow"></span><span class="lcnt" id="rCnt"></span></div>
 <div class="shd" id="cShd" aria-hidden="true"></div>
 <div class="glow" id="glow"></div>
 <svg class="shape" id="cSvg" aria-hidden="true"><defs><linearGradient id="cGl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a3a3d" stop-opacity=".9"/><stop offset="1" stop-color="#232325" stop-opacity=".86"/></linearGradient></defs><rect id="cRect"/></svg>
@@ -37,7 +38,7 @@ stage.insertAdjacentHTML('beforeend', `
 const $ = s => stage.querySelector(s);
 const guide = $('.guide');
 const cSvg = $('#cSvg'), cRect = $('#cRect'), cShd = $('#cShd'), pSvg = $('#pSvg'), pRect = $('#pRect'), pRectA = $('#pRectA'), pShd = $('#pShd');
-const cc = $('#cc'), glowEl = $('#glow'), pc = $('#pc'), pci = $('#pci');
+const cc = $('#cc'), glowEl = $('#glow'), pc = $('#pc'), pci = $('#pci'), pr = $('#pr'), rRev = $('#rRev'), rCnt = $('#rCnt');
 const lRev = $('#lRev'); let rev1 = false; // «Проверю перед вставкой» — only for this dictation
 const lText = $('#lText'), lTitle = $('#lTitle'), lCnt = $('#lCnt'), lBody = $('#lBody'), lDot = $('#lDot');
 const wave = $('#wave'), wctx = wave.getContext('2d'), timeEl = $('#time'), procTxt = $('#procTxt'), doneTxt = $('#doneTxt'), hintTxt = $('#hintTxt'), hintB = $('#hintB'), errTxt = $('#errTxt');
@@ -115,6 +116,8 @@ const mv = v => { const m = motionValue(v); m.on('change', req); return m; };
 const G = { w: mv(42), h: mv(6), s: mv(1), px: mv(0), py: mv(0), dx: mv(0), op: mv(.85), br: mv(0), sq: mv(0), gl: mv(0) };
 const P = { x: mv(0), y: mv(0), w: mv(0), h: mv(0), r: mv(18), op: mv(0), k: mv(1) };
 const PC = { op: mv(0), dy: mv(0), sc: mv(1), bl: mv(0) };
+// «Текст внутри капсулы»: how far the capsule has grown into the text block (0 — the capsule, 1 — the block), up and sideways
+const IN = { tv: mv(0), th: mv(0) };
 const TK = mv(1);
 const GR = {};
 [['gMini', 'mini'], ['gHint', 'hint'], ['gRec', 'rec'], ['gProc', 'proc'], ['gRev', 'rev'], ['gDone', 'done'], ['gErr', 'err']].forEach(([id, key]) => {
@@ -166,6 +169,8 @@ function apply(o = {}) {
   layoutWave();
   if (o.instant) G.s.jump(S.scale / 100); else if (Math.abs(G.s.get() - S.scale / 100) > .0005) animate(G.s, S.scale / 100, SPRu(.32, .12));
   retarget({ instant: o.instant });
+  // «Текст внутри капсулы» was switched while the text is open: show it again the new way
+  if (pVis && iOn !== !!S.inl) { const was = panelOpen; closePanel(true); if (was) openPanel(); }
   if (panelOpen) updatePanel();
   req();
 }
@@ -199,6 +204,8 @@ function rad(h, w = 1e9) {
 function panelRad() { return { pill: 20, round: 16, square: 10 }[S.shape]; }
 function groupFor() {
   if (state === 'idle') { if (hover && S.hint) return 'hint'; return S.idle === 'mini' ? 'mini' : null; }
+  // «Текст внутри капсулы»: in review the capsule is the window itself, «Enter — вставить» is in its footer
+  if (state === 'review' && S.inl) return null;
   return { rec: 'rec', proc: 'proc', review: 'rev', done: 'done', err: 'err' }[state] || null;
 }
 function measureRec() {
@@ -223,6 +230,7 @@ function target() {
     return { w: Math.round(42 * k), h: Math.max(2, Math.round(6 * k)), g };
   }
   if (state === 'rec') { recLay = measureRec(); return { w: recLay.w, h: 36, g }; }
+  if (!g) return { w: Math.round(GR.rev.inner.offsetWidth), h: 36, g };
   return { w: Math.round(GR[g].inner.offsetWidth), h: 36, g };
 }
 function freeCenter(w, h, s) {
@@ -328,6 +336,8 @@ function shake() { animate(G.dx, [0, -7, 6, -4, 2, 0], { duration: .42 / K(), ea
 
 /* ---------------- one draw per frame */
 const D = { x: 0, y: 0, w: 42, h: 6, cx: 0, cy: 0, r: 3 };
+// the shape as it is drawn: the same as D, or — «Текст внутри капсулы» — the capsule grown into the text block
+const B = { x: 0, y: 0, w: 42, h: 6, r: 3 };
 function draw() {
   drawQ = false;
   const s = G.s.get();
@@ -340,17 +350,28 @@ function draw() {
   const W = w * s, H = h * s, r = rad(h, w), x = cx - W / 2, y = cy - H / 2;
   D.x = x; D.y = y; D.w = W; D.h = H; D.cx = cx; D.cy = cy; D.r = r * s;
   const op = G.op.get(), hb = BW / 2;
-  setA(cRect, 'x', x + hb); setA(cRect, 'y', y + hb); setA(cRect, 'width', Math.max(0, W - BW)); setA(cRect, 'height', Math.max(0, H - BW)); setA(cRect, 'rx', Math.max(0, r * s - hb));
+  let bx = x, by = y, bw = W, bh = H, bR = r * s;
+  if (iOn) {
+    // between the capsule as it is right now and the block (P): going back it lands on the capsule wherever it is by then
+    const th = IN.th.get(), tv = IN.tv.get();
+    bx = x + (P.x.get() - x) * th; bw = Math.max(0, W + (P.w.get() - W) * th);
+    by = y + (P.y.get() - y) * tv; bh = Math.max(0, H + (P.h.get() - H) * tv);
+    bR = Math.max(0, Math.min(bR + (P.r.get() - bR) * clamp(tv, 0, 1), bw / 2, bh / 2));
+  }
+  B.x = bx; B.y = by; B.w = bw; B.h = bh; B.r = bR;
+  setA(cRect, 'x', bx + hb); setA(cRect, 'y', by + hb); setA(cRect, 'width', Math.max(0, bw - BW)); setA(cRect, 'height', Math.max(0, bh - BW)); setA(cRect, 'rx', Math.max(0, bR - hb));
   const o3 = f3(op);
   setS(cSvg, 'opacity', o3); setS(cc, 'opacity', o3);
-  if (S.shadow) { setS(cShd, 'transform', `translate(${f2(x)}px,${f2(y)}px)`); setS(cShd, 'width', f2(W) + 'px'); setS(cShd, 'height', f2(H) + 'px'); setS(cShd, 'borderRadius', f2(r * s) + 'px'); setS(cShd, 'opacity', o3); }
+  if (S.shadow) { setS(cShd, 'transform', `translate(${f2(bx)}px,${f2(by)}px)`); setS(cShd, 'width', f2(bw) + 'px'); setS(cShd, 'height', f2(bh) + 'px'); setS(cShd, 'borderRadius', f2(bR) + 'px'); setS(cShd, 'opacity', o3); }
   // content rides with the shape, always in whole device pixels (like the live panel): nothing to snap when it
   // stops, so it does not jump at the end of the opening; the clip follows the real (unsnapped) shape
   const tx = snap(cx), ty = snap(cy), ox = (cx - tx) / s, oy = (cy - ty) / s;
   setS(cc, 'transform', `translate(${f2(tx)}px,${f2(ty)}px) scale(${f4(s)})`);
-  setS(cc, 'clipPath', `inset(${f2(CH / 2 - h / 2 + oy)}px ${f2(CW / 2 - w / 2 - ox)}px ${f2(CH / 2 - h / 2 - oy)}px ${f2(CW / 2 - w / 2 + ox)}px round ${f2(r)}px)`);
+  // (grown into the block, the clip is the block: the controls change over inside it without being cut in mid-air)
+  if (iOn) setS(cc, 'clipPath', `inset(${f2(CH / 2 + (by - ty) / s)}px ${f2(CW / 2 - (bx + bw - tx) / s)}px ${f2(CH / 2 - (by + bh - ty) / s)}px ${f2(CW / 2 + (bx - tx) / s)}px round ${f2(bR / s)}px)`);
+  else setS(cc, 'clipPath', `inset(${f2(CH / 2 - h / 2 + oy)}px ${f2(CW / 2 - w / 2 - ox)}px ${f2(CH / 2 - h / 2 - oy)}px ${f2(CW / 2 - w / 2 + ox)}px round ${f2(r)}px)`);
   for (const k in GR) drawG(GR[k], w, h);
-  setS(glowEl, 'width', f2(W) + 'px'); setS(glowEl, 'height', f2(H) + 'px'); setS(glowEl, 'borderRadius', f2(r * s) + 'px');
+  setS(glowEl, 'width', f2(bw) + 'px'); setS(glowEl, 'height', f2(bh) + 'px'); setS(glowEl, 'borderRadius', f2(bR) + 'px');
   glowDraw();
   if (pVis) drawPanel();
   hitReport();
@@ -379,7 +400,8 @@ function drawG(g, w, h) {
 function glowDraw() {
   const o = G.gl.get() * glowAmt * (.3 + .7 * lv) * G.op.get();
   setS(glowEl, 'opacity', f3(o));
-  if (o > .001) setS(glowEl, 'transform', `translate(${f2(D.x)}px,${f2(D.y)}px) scale(${f4(1 + lv * .06)})`);
+  // (the swell with the voice stays the same few pixels when the capsule has grown into the text block)
+  if (o > .001) setS(glowEl, 'transform', `translate(${f2(B.x)}px,${f2(B.y)}px) scale(${f4(1 + lv * .06 * (B.w > D.w && B.w > 0 ? D.w / B.w : 1))})`);
 }
 
 /* ---------------- overlay: tell the app where the capsule is, so only it catches the mouse */
@@ -387,8 +409,8 @@ let hitKey = '', hitT = 0, hitR = [];
 function hitReport() {
   if (!ENV.onHit) return;
   const d = dpr(), R = [];
-  if (!(hidden && state === 'idle')) { const m = state === 'idle' ? 14 : 4; R.push([(D.x - m) * d, (D.y - m) * d, (D.w + 2 * m) * d, (D.h + 2 * m) * d]); }
-  if (pVis && P.op.get() > .05) R.push([P.x.get() * d, P.y.get() * d, Math.max(0, P.w.get()) * d, Math.max(0, P.h.get()) * d]);
+  if (!(hidden && state === 'idle')) { const m = state === 'idle' ? 14 : 4; R.push([(B.x - m) * d, (B.y - m) * d, (B.w + 2 * m) * d, (B.h + 2 * m) * d]); }
+  if (pVis && !iOn && P.op.get() > .05) R.push([P.x.get() * d, P.y.get() * d, Math.max(0, P.w.get()) * d, Math.max(0, P.h.get()) * d]);
   const key = R.map(r => r.map(v => Math.round(v)).join(',')).join(';');
   if (key === hitKey) return;
   hitKey = key; hitR = R;
@@ -397,7 +419,12 @@ function hitReport() {
 
 /* ---------------- live panel: an SVG shape that grows out of the capsule (or out of the record dot) + its content */
 let pVis = false, pBox = { w: 420, h: 100 }, pT = null, pOpenT = 0, pTok = 0;
+// «Текст внутри капсулы» (S.inl): there is no separate panel — the capsule itself grows into the block with the text
+// (draw() does the shape, drawInl() the text on it) and shrinks back. iOn — the text now open is shown that way.
+let iOn = false, rowH = 36, revW = null;
+const REV = ['Проверю перед вставкой', 'Проверю'];
 function drawPanel() {
+  if (iOn) { drawInl(); return; }
   const x = P.x.get(), y = P.y.get(), w = Math.max(0, P.w.get()), h = Math.max(0, P.h.get());
   const r = Math.max(0, Math.min(P.r.get(), w / 2, h / 2)), hb = BW / 2;
   setA(pRect, 'x', x + hb); setA(pRect, 'y', y + hb); setA(pRect, 'width', Math.max(0, w - BW)); setA(pRect, 'height', Math.max(0, h - BW)); setA(pRect, 'rx', Math.max(0, r - hb));
@@ -414,18 +441,38 @@ function drawPanel() {
   setS(pc, 'transform', `translate(${f2(tx)}px,${f2(ty)}px)`);
   const cl = x - tx, ct = y - ty;
   setS(pc, 'clipPath', `inset(${f2(Math.max(0, ct))}px ${f2(Math.max(0, pBox.w - cl - w))}px ${f2(Math.max(0, pBox.h - ct - h))}px ${f2(Math.max(0, cl))}px round ${f2(r)}px)`);
+  drawPci();
+}
+function drawPci() {
   const po = PC.op.get();
   setS(pci, 'opacity', f3(po * Math.min(1, P.op.get() * 1.5)));
   const dy = PC.dy.get();
   setS(pci, 'transform', Math.abs(dy) < .01 ? 'none' : `translate(0px,${f2(Math.round(dy * dpr()) / dpr())}px)`);
   const b = PC.bl.get(); setS(pci, 'filter', b > .05 ? `blur(${f2(b)}px)` : 'none');
 }
+// the text on the grown capsule: real size, pinned to the block's top edge and centre (the same shutter as the panel),
+// cut off where the capsule's own row is — its controls stay there; beside them, in the corners of that row,
+// «Проверю перед вставкой» and the word count (pr)
+function drawInl() {
+  const rev = pc.dataset.mode === 'review', up = pc.dataset.dir === 'up', rh = rev ? 0 : rowH;
+  const tx = snap(B.x + B.w / 2 - pBox.w / 2), ty = snap(B.y), cl = B.x - tx, ct = B.y - ty, r = f2(B.r) + 'px';
+  setS(pc, 'transform', `translate(${f2(tx)}px,${f2(ty)}px)`);
+  setS(pc, 'clipPath', `inset(${f2(Math.max(0, ct + (up ? 0 : rh)))}px ${f2(Math.max(0, pBox.w - cl - B.w))}px ${f2(Math.max(0, pBox.h - ct - B.h + (up ? rh : 0)))}px ${f2(Math.max(0, cl))}px round ${!rh || up ? r : '0px'} ${!rh || up ? r : '0px'} ${!rh || !up ? r : '0px'} ${!rh || !up ? r : '0px'})`);
+  drawPci();
+  const ro = rev ? 0 : PC.op.get() * clamp(IN.th.get() * 2 - 1, 0, 1);
+  setS(pr, 'visibility', ro > .01 ? 'visible' : 'hidden');
+  if (ro > .01) {
+    setS(pr, 'opacity', f3(ro)); setS(pr, 'width', f2(B.w) + 'px');
+    setS(pr, 'transform', `translate(${f2(snap(B.x))}px,${f2(snap(up ? B.y + B.h - rowH : B.y))}px)`);
+  }
+}
 function setMode() {
   pc.dataset.mode = state === 'review' ? 'review' : state === 'rec' ? 'rec' : 'proc';
-  pc.toggleAttribute('data-rb', !!(S.revBtn && !S.review)); lRev.classList.toggle('on', rev1);
+  pc.toggleAttribute('data-rb', !!(S.revBtn && !S.review)); lRev.classList.toggle('on', rev1); rRev.classList.toggle('on', rev1);
   lTitle.textContent = state === 'review' ? 'Проверь текст' : state === 'rec' ? 'Слушаю…' : (S.clean ? 'Причёсываю…' : 'Распознаю…');
 }
 function panelTarget() {
+  if (iOn) return inlTarget();
   const pw = Math.min(S.pw, SW - 24);
   if (pci._w !== pw) { pci.style.width = pw + 'px'; pci._w = pw; }
   const c = capFinal();
@@ -442,10 +489,42 @@ function panelTarget() {
   y = clamp(y, top, SH - TASK - 8 - ph);
   return { x, y, w: pw, h: ph, r: panelRad(), above };
 }
-function showPanel() { if (!pVis) { pVis = true; pSvg.style.visibility = pShd.style.visibility = 'visible'; pc.style.visibility = 'visible'; pc.removeAttribute('aria-hidden'); } }
+// the block the capsule grows into: as wide as the panel would be, around the capsule (near a screen edge it shifts,
+// the capsule stays inside); it grows up when the capsule is in the lower half of the screen and down otherwise, so
+// the capsule's row — the dot that was clicked — does not move. In review it is the usual window: title, text, buttons.
+function inlTarget() {
+  const c = capFinal(), rev = state === 'review';
+  const pw = Math.min(Math.max(S.pw, Math.ceil(c.w) + 28), SW - 24);
+  if (pci._w !== pw) { pci.style.width = pw + 'px'; pci._w = pw; }
+  const up = c.cy > (SH - TASK) / 2, top = ENV.top || 8, dir = up ? 'up' : 'down';
+  if (pc.dataset.dir !== dir) pc.dataset.dir = dir;
+  rowH = Math.round(c.h);
+  if (pci._rh !== rowH) { pci._rh = rowH; pci.style.setProperty('--rowh', rowH + 'px'); pr.style.height = rowH + 'px'; }
+  // not enough room: the text scrolls instead of the block growing past the edge
+  const avail = up ? c.y + c.h - top : SH - TASK - 8 - c.y;
+  const chrome = pci.offsetHeight - lBody.offsetHeight, bm = Math.max(40, Math.floor(avail - chrome));
+  const mh = bm < 210 ? bm + 'px' : '';
+  if (lBody.style.maxHeight !== mh) lBody.style.maxHeight = mh;
+  const ph = pci.offsetHeight;
+  pBox = { w: pw, h: ph };
+  const x = clamp(clamp(c.cx - pw / 2, 12, SW - 12 - pw), c.x + c.w + 6 - pw, c.x - 6);
+  if (!rev) sideFit(c.x - x - 22, x + pw - c.x - c.w - 22);
+  return { x, y: up ? c.y + c.h - ph : c.y, w: pw, h: ph, r: panelRad(), above: up };
+}
+// what fits beside the capsule in its row: the button on the left (a shorter name if it is tight), the count on the right
+function sideFit(l, r) {
+  if (!revW) { const c = document.createElement('canvas').getContext('2d'); c.font = '600 11.5px Manrope'; revW = REV.map(t => c.measureText(t).width + 20); }
+  const t = l >= revW[0] ? REV[0] : l >= revW[1] ? REV[1] : '';
+  pr.toggleAttribute('data-rb', !!(t && state === 'rec' && S.revBtn && !S.review));
+  if (t && rRev.textContent !== t) rRev.textContent = t;
+  rCnt.style.visibility = r >= 64 ? '' : 'hidden';
+}
+function setInl(on) { iOn = on; pc.toggleAttribute('data-inl', on); }
+function showPanel() { if (!pVis) { pVis = true; pSvg.style.visibility = pShd.style.visibility = iOn ? 'hidden' : 'visible'; pc.style.visibility = 'visible'; pc.removeAttribute('aria-hidden'); } }
 function hidePanel() {
   pVis = false; pSvg.style.visibility = pShd.style.visibility = 'hidden'; pc.style.visibility = 'hidden'; pc.setAttribute('aria-hidden', 'true');
   P.op.jump(0); PC.op.jump(0); P.k.jump(0); pT = null;
+  if (iOn) { IN.tv.jump(0); IN.th.jump(0); setS(pr, 'visibility', 'hidden'); setInl(false); }
 }
 function toPanel(t, mode) {
   const st = sty();
@@ -463,6 +542,8 @@ function toPanel(t, mode) {
 function openPanel() {
   if (panelOpen) return;
   panelOpen = true; cc.dataset.open = 1; pTok++;
+  if (pVis && iOn !== !!S.inl) hidePanel(); // still closing the other way
+  if (S.inl) { openInl(); return; }
   setMode(); showPanel();
   const t = panelTarget(), st = sty(), fresh = P.op.get() < .02;
   pOpenT = performance.now() + st.pvd * 1000 / K();
@@ -481,14 +562,41 @@ function openPanel() {
   req();
   if (rec && rec.real && state === 'rec') partialLoop(rec, true); // the text was just opened while speaking: ask Groq at once
 }
+// «Текст внутри капсулы»: the capsule grows into the block. The block (P) is set at once; IN takes the shape from
+// the capsule to it — «Капля» swells up first and spreads sideways after, the other styles grow evenly.
+function openInl() {
+  const st = sty(), fresh = !pVis;
+  setInl(true); setMode(); showPanel();
+  const t = panelTarget();
+  pOpenT = performance.now() + st.pvd * 1000 / K();
+  P.op.jump(1);
+  if (fresh) {
+    toPanel(t, 'jump'); IN.tv.jump(0); IN.th.jump(0);
+    PC.op.jump(0); PC.dy.jump(t.above ? 12 : -12); PC.sc.jump(1); PC.bl.jump(st.blur ? 6 : 0);
+  } else toPanel(t, 'resize');
+  if (S.anim === 'drop') { animate(IN.tv, 1, SPRu(.34, .24)); animate(IN.th, 1, SPRu(.5, .18, .05)); }
+  else { animate(IN.tv, 1, SPRu(st.pvd, st.pb)); animate(IN.th, 1, SPRu(st.pvd, st.pb)); }
+  animate(PC.op, 1, TW(.26, .08, [.3, 0, .2, 1]));
+  animate(PC.dy, 0, SPR(st.pvd * .95, Math.min(.3, st.pb + .05), .03));
+  if (PC.bl.get() > 0) animate(PC.bl, 0, TW(.3, .05));
+  req();
+  if (rec && rec.real && state === 'rec') partialLoop(rec, true);
+}
+// …and back: IN returns to 0, where the shape is the capsule itself — whatever it has turned into by then
+function closeInl(st, my) {
+  const drop = S.anim === 'drop', vd = Math.min(.42, st.pvd * .85), b = Math.min(.12, st.pb * .5);
+  animate(IN.th, 0, drop ? SPRu(.3, .1) : SPRu(vd, b));
+  animate(IN.tv, 0, drop ? SPRu(.34, .2, .08) : SPRu(vd, b)).then(() => { if (my === pTok && !panelOpen) hidePanel(); });
+}
 function closePanel(instant) {
   if (phs.length) phDrop();
   if (!panelOpen && !pVis) return;
   panelOpen = false; cc.dataset.open = 0;
   const my = ++pTok;
-  if (instant) { [P.x, P.y, P.w, P.h, P.r, P.k, PC.dy, PC.sc, PC.bl].forEach(v => v.stop()); hidePanel(); req(); return; }
+  if (instant) { [P.x, P.y, P.w, P.h, P.r, P.k, PC.dy, PC.sc, PC.bl, IN.tv, IN.th].forEach(v => v.stop()); hidePanel(); req(); return; }
   animate(PC.op, 0, TW(.09, 0, [.4, 0, 1, 1]));
   const st = sty();
+  if (iOn) { closeInl(st, my); return; }
   if (S.anim === 'fade') {
     animate(P.y, P.y.get() + (P.y.get() < D.y ? 6 : -6), SPR(.3, 0));
     animate(P.op, 0, TW(.18)).then(() => { if (my === pTok) hidePanel(); });

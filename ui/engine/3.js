@@ -35,15 +35,17 @@ function action(k) {
     toIdle();
   }
 }
-pc.addEventListener('click', e => {
+function panelClick(e) {
   const b = e.target.closest('[data-k]'); if (!b) return;
-  if (b.dataset.k === 'rev1') { if (state === 'rec') { rev1 = !rev1; b.classList.toggle('on', rev1); } return; }
+  if (b.dataset.k === 'rev1') { if (state === 'rec') { rev1 = !rev1; lRev.classList.toggle('on', rev1); rRev.classList.toggle('on', rev1); } return; }
   if (b.dataset.k === 'insert') insert(lText.innerText);
   if (b.dataset.k === 'copy') {
     const t = lText.innerText.trim();
     Promise.resolve(ENV.copy ? ENV.copy(t) : navigator.clipboard.writeText(t)).then(() => { b.textContent = 'Скопировано'; setTimeout(() => { b.textContent = 'Копировать'; }, 1400); }, () => {});
   }
-});
+}
+pc.addEventListener('click', panelClick);
+pr.addEventListener('click', panelClick);
 lText.addEventListener('pointerdown', () => { if (state === 'review' && OVERLAY && !editing) { setEditing(true); setTimeout(() => lText.focus({ preventScroll: true }), 60); } });
 lText.addEventListener('keydown', e => {
   if (state !== 'review') return;
@@ -153,7 +155,7 @@ window.addEventListener('storage', e => { if (e.key === RA.KEY) reload(); });
 measureStage();
 apply({ instant: true });
 draw();
-document.fonts && document.fonts.ready.then(() => { spFor = ''; measureSpace(); retarget({ instant: true }); });
+document.fonts && document.fonts.ready.then(() => { spFor = ''; revW = null; measureSpace(); retarget({ instant: true }); });
 const API = {
   hk, key, setHidden, hitInside, reload, preview, demo, startRec, finish, cancel, toIdle, insert, openPanel, closePanel, togglePanel, setState,
   opt(o) {
@@ -163,7 +165,7 @@ const API = {
   },
   measure() { measureStage(); req(); },
   setTask(t) { TASK = t; req(); },
-  get S() { return S; }, get state() { return state; }, get panelOpen() { return panelOpen; }, get lv() { return lv; }, get words() { return words; }, G, P, D
+  get S() { return S; }, get state() { return state; }, get panelOpen() { return panelOpen; }, get lv() { return lv; }, get words() { return words; }, G, P, D, B, IN
 };
 window.__cap = API;
 if (ENV.ready) ENV.ready(API);

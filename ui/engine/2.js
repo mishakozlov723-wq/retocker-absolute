@@ -24,7 +24,7 @@ lBody.addEventListener('scroll', lbFade, { passive: true });
 lBody.addEventListener('scrollend', () => { autoScroll = 0; lbFade(); });
 new ResizeObserver(lbFade).observe(lText);
 new ResizeObserver(lbFade).observe(lBody);
-function updCount() { const n = wc(words.filter(w => !w.dead).map(w => w.t).join(' ')); lCnt.textContent = n ? words_(n) : ''; }
+function updCount() { const n = wc(words.filter(w => !w.dead).map(w => w.t).join(' ')); lCnt.textContent = rCnt.textContent = n ? words_(n) : ''; }
 
 /* ---------------- text model */
 function addWord(t, meta = {}) {
@@ -529,6 +529,8 @@ function fail(msg, act) {
   idleT = setTimeout(toIdle, act === 'retry' ? 9000 : act ? 6000 : 2600);
 }
 function toReview(text) {
+  // «Текст внутри капсулы», the text is already open: the title comes in above it, the text itself must not jump
+  const textY = () => lText.offsetTop + (parseFloat(getComputedStyle(lText).paddingTop) || 0), y0 = iOn && panelOpen ? textY() : null;
   setState('review');
   lText.getAnimations({ subtree: true }).forEach(a => a.finish());
   lText.querySelectorAll('.ghost').forEach(g => g.remove());
@@ -536,6 +538,7 @@ function toReview(text) {
   lText.contentEditable = 'true';
   setMode();
   if (!panelOpen) openPanel(); else updatePanel();
+  if (y0 != null && iOn) { PC.dy.jump(PC.dy.get() + y0 - textY()); animate(PC.dy, 0, SPR(.3, .06)); }
   $('#lFoot').animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 300 / K(), delay: 80 / K(), easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'backwards' });
   if (!OVERLAY) setTimeout(() => { if (state !== 'review') return; lText.focus({ preventScroll: true }); const sel = getSelection(); sel.selectAllChildren(lText); sel.collapseToEnd(); }, 80);
 }

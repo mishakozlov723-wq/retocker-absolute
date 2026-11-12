@@ -129,3 +129,17 @@
 .lt .fixsweep{position:absolute;top:-4px;bottom:-4px;left:0;width:45%;pointer-events:none;background:linear-gradient(100deg,transparent,rgba(255,255,255,.055) 45%,rgba(255,255,255,.08) 50%,rgba(255,255,255,.055) 55%,transparent);border-radius:8px}
 .lt .fixsweep.on-light{background:linear-gradient(100deg,transparent,rgba(0,0,0,.035) 45%,rgba(0,0,0,.05) 50%,rgba(0,0,0,.035) 55%,transparent)}
 
+/* ---------- «Текст внутри капсулы»: no separate panel — the capsule itself grows into the block (its own shape, cRect),
+   the text lies on it (above the shape, under the capsule's controls) and leaves the capsule's row free */
+.pc[data-inl]{z-index:12}
+.pc[data-inl]:not([data-mode=review]) .lh{display:none}
+.pc[data-inl][data-dir=up]:not([data-mode=review]) .pci{padding-bottom:var(--rowh,36px)}
+.pc[data-inl][data-dir=down]:not([data-mode=review]) .pci{padding-top:var(--rowh,36px)}
+.pc[data-inl][data-dir=up]:not([data-mode=review]) .lb{padding:14px 18px 6px}
+.pc[data-inl][data-dir=down]:not([data-mode=review]) .lb{padding:4px 18px 14px}
+/* the corners of the capsule's row: «Проверю перед вставкой» on the left, the word count on the right */
+.pr{position:absolute;left:0;top:0;height:36px;z-index:12;display:flex;align-items:center;gap:8px;padding:0 12px;visibility:hidden;pointer-events:none;will-change:transform,opacity;font-size:12px}
+.pr .grow{flex:1}
+.pr .lchk{pointer-events:auto}
+.pr[data-rb] .lchk{display:inline-flex}
+
