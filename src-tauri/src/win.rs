@@ -45,16 +45,22 @@ pub fn overlay_styles(h: HWND) {
   }
 }
 
-/// click-through on/off (the same window styles Electron uses; nothing else about the window changes)
+/// click-through on/off (the same window styles Electron uses; nothing else about the window changes).
+/// Also puts back the overlay styles Tauri drops when it rewrites them (see overlay_loop).
 pub fn set_clickthrough(h: HWND, on: bool) {
   unsafe {
     let ex = GetWindowLongPtrW(h, GWL_EXSTYLE);
-    let t = (WS_EX_TRANSPARENT.0 | WS_EX_LAYERED.0) as isize;
-    let nx = if on { ex | t } else { (ex & !(WS_EX_TRANSPARENT.0 as isize)) | WS_EX_LAYERED.0 as isize };
+    let keep = (ex | (WS_EX_LAYERED.0 | WS_EX_TOOLWINDOW.0) as isize) & !(WS_EX_APPWINDOW.0 as isize);
+    let t = WS_EX_TRANSPARENT.0 as isize;
+    let nx = if on { keep | t } else { keep & !t };
     if nx != ex {
       SetWindowLongPtrW(h, GWL_EXSTYLE, nx);
     }
   }
+}
+
+pub fn visible(h: HWND) -> bool {
+  unsafe { IsWindowVisible(h).as_bool() }
 }
 
 /// keep the overlay above other always-on-top windows (the taskbar sometimes jumps over it)

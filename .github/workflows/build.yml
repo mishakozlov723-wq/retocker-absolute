@@ -109,6 +109,23 @@ jobs:
           gh release create "v$VER" Retocker-Voice-Setup.exe Retocker-Voice-portable.exe latest.json \
             --title "Retocker Voice $VER" --notes-file RELEASE.md 2>&1 | tee -a ci.log
 
+      # The app looks for updates in the public repository (this one is private). The same three files go there;
+      # gh publishes the release only after the files are uploaded, so «latest» never points at an empty one.
+      - name: Publish for everyone
+        if: contains(github.event.head_commit.message, '[release]')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.DOWNLOAD_TOKEN }}
+        run: |
+          set -o pipefail
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::The DOWNLOAD_TOKEN secret is not set: v$VER was not copied to retocker-absolute-download, so the app will not see this update."
+            exit 0
+          fi
+          gh release create "v$VER" Retocker-Voice-Setup.exe Retocker-Voice-portable.exe latest.json \
+            --repo mishakozlov723-wq/retocker-absolute-download --latest \
+            --title "Retocker Voice $VER" --notes-file RELEASE.md 2>&1 | tee -a ci.log
+
       - name: Keep the build
         uses: actions/upload-artifact@v4
         with:
